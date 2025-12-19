@@ -1,4 +1,18 @@
-#ignore all kind of files
+# Ignore all kind of files
 *.*
-#except py files
+# Except py files
 !*.py
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Simulation output directories
+coalescence2D/
+duarte/
+
+# General temp/output folders
+output/
+_pyoomph/
+*.vtu
+*.pvd

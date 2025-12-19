@@ -36,8 +36,8 @@ class DropletCoalescence(DropletSpreading):
 		self.Lx=6
 		self.max_refinement_level=6
 
-		self.Ca=1e0
-		self.Ma=float(sys.argv[1])
+		self.beta=float(sys.argv[1])  # surfactant strength (β)
+		self.Pe=float(sys.argv[2])    # Péclet number
 		# self.plotter = PlotterTry(self)
 			
 					
@@ -49,7 +49,7 @@ class DropletCoalescence(DropletSpreading):
 
 		# self.sigma=self.sigma-self.ma*Gamma
 
-		eqs=LubricationEquations(Ca=self.Ca,Ma=self.Ma) # equations
+		eqs=LubricationEquations(beta=self.beta, Pe=self.Pe) # equations
 		eqs+=MeshFileOutput() # output	
 		x=var("coordinate")
 
