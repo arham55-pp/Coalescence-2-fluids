@@ -1,4 +1,4 @@
-from lubrication import *
+from lubrication_clean import *
 		
 class DropletSpreading(Problem):	
 	def __init__(self):

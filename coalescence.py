@@ -1,11 +1,9 @@
 import sys
-from pyoomph.materials import * 
-import pyoomph.materials.default_materials
-
-from pyoomph.generic.problem import Problem
+from pyoomph import *
+from pyoomph.expressions import *
 from pyoomph.meshes.meshdatacache import MeshDataEigenModes
 from pyoomph.typings import List, Optional, Union
-from lubrication_spreading import * 
+from lubrication import LubricationEquations  # surfactant version (beta, Pe)
 from pyoomph.output.plotting import *
 from pyoomph.output.meshio import TextFileOutputAlongLine
 
@@ -25,9 +23,9 @@ class PlotterTry(MatplotlibPlotter):
 
 		self.add_plot("domain/h", colorbar=colorbar_1)
 
-class DropletCoalescence(DropletSpreading):	
+class DropletCoalescence(Problem):
 	def __init__(self):
-		super(DropletCoalescence,self).__init__()
+		super(DropletCoalescence, self).__init__()
 		self.L=1
 		self.theta=10*pi/180
 		self.R=self.L/(sin(self.theta))
