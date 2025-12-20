@@ -26,23 +26,25 @@ class PlotterTry(MatplotlibPlotter):
 class DropletCoalescence(Problem):
 	def __init__(self):
 		super(DropletCoalescence, self).__init__()
-		self.L=1
-		self.theta=10*pi/180
-		self.R=self.L/(sin(self.theta))
-		self.H=self.R-self.L/(tan(self.theta))
-		self.hp=0.0001
-		self.Lx=6
-		self.max_refinement_level=6
+		# Geometry (see paper §2.1)
+		self.L = 1                      # contact line radius (length scale)
+		self.theta = 20 * pi / 180      # contact angle (20° as in paper)
+		self.R = self.L / sin(self.theta)  # sphere radius
+		self.H = self.R - self.L / tan(self.theta)  # apex height
+		self.hp = 1e-4                  # precursor film thickness h_∞/L = 10⁻⁴
+		self.Lx = 6                     # domain size [-3, 3]
+		self.N = 1000                   # number of elements
+		self.max_refinement_level = 6
 
-		# Surfactant parameters (with defaults)
-		self.beta = float(sys.argv[1]) if len(sys.argv) > 1 else 0.1   # surfactant strength (β)
-		self.Pe = float(sys.argv[2]) if len(sys.argv) > 2 else 1.0     # Péclet number
-		self.Gamma_0 = float(sys.argv[3]) if len(sys.argv) > 3 else 0.8  # initial surfactant concentration
+		# Surfactant parameters (with defaults, see paper §2.2)
+		self.beta = float(sys.argv[1]) if len(sys.argv) > 1 else 0.1    # surfactant strength (β)
+		self.Pe = float(sys.argv[2]) if len(sys.argv) > 2 else 1.0      # Péclet number
+		self.Gamma_0 = float(sys.argv[3]) if len(sys.argv) > 3 else 0.8 # initial surfactant concentration
 		# self.plotter = PlotterTry(self)
 			
 					
 	def define_problem(self):
-		self.add_mesh(LineMesh(minimum=-3,size=self.Lx, N=1000)) 
+		self.add_mesh(LineMesh(minimum=-3, size=self.Lx, N=self.N)) 
 		
 		h=var("h") 
 		Gamma=var("Gamma")

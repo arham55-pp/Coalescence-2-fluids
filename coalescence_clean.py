@@ -5,21 +5,22 @@ from lubrication_clean import LubricationEquations
 class DropletCoalescence(Problem):
 	def __init__(self):
 		super(DropletCoalescence, self).__init__()
-		# Geometry: spherical cap droplets
-		self.L = 1  # contact line radius
-		self.theta = 10 * pi / 180  # contact angle
+		# Geometry (see paper §2.1)
+		self.L = 1                      # contact line radius (length scale)
+		self.theta = 20 * pi / 180      # contact angle (20° as in paper)
 		self.R = self.L / sin(self.theta)  # sphere radius
 		self.H = self.R - self.L / tan(self.theta)  # apex height
-		self.hp = 0.0001  # precursor film thickness
-		self.Lx = 6  # domain size
+		self.hp = 1e-4                  # precursor film thickness h_∞/L = 10⁻⁴
+		self.Lx = 6                     # domain size [-3, 3]
+		self.N = 1000                   # number of elements
 		self.max_refinement_level = 6
 
 		# Physical parameters
-		self.sigma = 1  # surface tension
+		self.sigma = 1  # surface tension (dimensionless)
 
 	def define_problem(self):
 		# 1D mesh from x = -3 to x = 3
-		self.add_mesh(LineMesh(minimum=-3, size=self.Lx, N=1000))
+		self.add_mesh(LineMesh(minimum=-3, size=self.Lx, N=self.N))
 
 		h = var("h")
 
