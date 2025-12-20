@@ -8,10 +8,10 @@ __pycache__/
 *.pyc
 
 # Simulation output directories
-coalescence2D/
+coalescence/
 coalescence_clean/
+spreading_clean/
 lubrication_clean/
-lubrication_spreading/
 lubrication/
 *_plots/
 *_frames/
