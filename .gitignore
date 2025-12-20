@@ -9,10 +9,18 @@ __pycache__/
 
 # Simulation output directories
 coalescence2D/
-duarte/
+*_plots/
+coalescence_clean/
+interfaceProfile/
+lubrication_clean/
+lubrication_spreading/
+lubrication/
 
 # General temp/output folders
 output/
 _pyoomph/
 *.vtu
 *.pvd
+
+# also keep these files
+!*.py
