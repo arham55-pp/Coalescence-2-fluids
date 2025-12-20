@@ -2,10 +2,10 @@ from pyoomph import *
 from pyoomph.expressions import *
 
 class LubricationEquations(Equations):
-	def __init__(self, beta=0.5, Pe=100):
+	def __init__(self, beta=0.1, Pe=1):
 		super(LubricationEquations, self).__init__()
-		self.beta = beta
-		self.Pe = Pe
+		self.beta = beta  # surfactant strength (Marangoni number)
+		self.Pe = Pe      # Péclet number (advection/diffusion ratio)
 		
 	def define_fields(self):
 		self.define_scalar_field("h","C2")

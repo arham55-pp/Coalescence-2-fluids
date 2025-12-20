@@ -34,8 +34,10 @@ class DropletCoalescence(Problem):
 		self.Lx=6
 		self.max_refinement_level=6
 
-		self.beta=float(sys.argv[1])  # surfactant strength (β)
-		self.Pe=float(sys.argv[2])    # Péclet number
+		# Surfactant parameters (with defaults)
+		self.beta = float(sys.argv[1]) if len(sys.argv) > 1 else 0.1   # surfactant strength (β)
+		self.Pe = float(sys.argv[2]) if len(sys.argv) > 2 else 1.0     # Péclet number
+		self.Gamma_0 = float(sys.argv[3]) if len(sys.argv) > 3 else 0.8  # initial surfactant concentration
 		# self.plotter = PlotterTry(self)
 			
 					
@@ -55,7 +57,8 @@ class DropletCoalescence(Problem):
 		h2=-self.R + self.H + (self.R**2 - (var("coordinate_x") - (2 * self.R * self.H - self.H**2)**(0.5))**2)**(0.5)
 		h_init=h_init=maximum(maximum(h1,h2),self.hp) 
 
-		Gamma_init = Gamma_init = -0.5*tanh(1/self.hp * var("coordinate_x")) + 0.5
+		# Surfactant IC: Γ = Γ₀ on left droplet (x<0), Γ = 0 on right droplet (x>0)
+		Gamma_init = self.Gamma_0 * (0.5 - 0.5*tanh(var("coordinate_x") / self.hp))
 		
 		eqs+=InitialCondition(Gamma=Gamma_init)
 		eqs+=InitialCondition(h=h_init) 
