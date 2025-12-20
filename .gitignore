@@ -9,12 +9,12 @@ __pycache__/
 
 # Simulation output directories
 coalescence2D/
-*_plots/
 coalescence_clean/
-interfaceProfile/
 lubrication_clean/
 lubrication_spreading/
 lubrication/
+*_plots/
+*_frames/
 
 # General temp/output folders
 output/
