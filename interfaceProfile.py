@@ -9,9 +9,9 @@ matplotlib.rcParams['axes.labelsize'] = 16
 matplotlib.rcParams['xtick.labelsize'] = 14
 matplotlib.rcParams['ytick.labelsize'] = 14
 
-folder_path = 'lubrication_coalescence/profile'
+folder_path = 'coalescence2D/domain'
 
-folder = 'VideoZoom'
+folder = 'Video1D_v1'
 if not os.path.exists(folder):
     os.makedirs(folder)
 
@@ -25,7 +25,7 @@ for file in files:
 
     file_path = os.path.join(folder_path, file)
     
-    data = pd.read_csv(file_path, delimiter='\t', skiprows=1, usecols=[0, 2], header=None)
+    data = pd.read_csv(file_path, delimiter='\t', skiprows=1, usecols=[0, 1], header=None)
     
     data.columns = ['x', 'h']
     
@@ -36,7 +36,7 @@ for file in files:
     ax.set_title('$t$ = %4.2f' % tt, fontsize=20)
     # ax.axis('equal')  
     
-    ax.set_xlim(-0.3, 0.3)
+    ax.set_xlim(-2.5, 3.1)
     ax.set_ylim(0, 0.3)
     
     output_file_path = os.path.join(folder, f'{os.path.splitext(file)[0]}.png')
