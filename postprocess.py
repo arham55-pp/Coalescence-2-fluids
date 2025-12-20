@@ -12,8 +12,8 @@ plt.rcParams['axes.labelsize'] = 12
 plt.rcParams['axes.titlesize'] = 14
 plt.rcParams['lines.linewidth'] = 1.5
 
-# Get base folder from command line, default to "coalescence2D"
-base_folder = sys.argv[1] if len(sys.argv) > 1 else "coalescence2D"
+# Get base folder from command line, default to "coalescence"
+base_folder = sys.argv[1] if len(sys.argv) > 1 else "coalescence"
 output_dir = f"{base_folder}/domain"
 plot_dir = f"{base_folder}_plots"
 
