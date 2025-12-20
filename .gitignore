@@ -24,3 +24,4 @@ _pyoomph/
 
 # also keep these files
 !*.py
+!*.md
