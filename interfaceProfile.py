@@ -1,5 +1,6 @@
 import os
-import pandas as pd
+import sys
+import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
 
@@ -9,40 +10,51 @@ matplotlib.rcParams['axes.labelsize'] = 16
 matplotlib.rcParams['xtick.labelsize'] = 14
 matplotlib.rcParams['ytick.labelsize'] = 14
 
-folder_path = 'lubrication_coalescence/profile'
+# Get base folder from command line, default to "coalescence"
+base_folder = sys.argv[1] if len(sys.argv) > 1 else "coalescence"
+output_dir = f"{base_folder}/domain"
+frame_dir = f"{base_folder}_frames"
 
-folder = 'VideoZoom'
-if not os.path.exists(folder):
-    os.makedirs(folder)
+if not os.path.exists(frame_dir):
+    os.makedirs(frame_dir)
 
-files = [f for f in os.listdir(folder_path) if f.endswith('.txt')]
+files = sorted([f for f in os.listdir(output_dir) if f.endswith('.txt')])
 
-tt = 0
-i = 0
+print(f"Processing {len(files)} files from {output_dir}...")
 
-for file in files:
-    tt = 0.1*i
+for i, file in enumerate(files):
+    file_path = os.path.join(output_dir, file)
 
-    file_path = os.path.join(folder_path, file)
-    
-    data = pd.read_csv(file_path, delimiter='\t', skiprows=1, usecols=[0, 2], header=None)
-    
-    data.columns = ['x', 'h']
-    
+    with open(file_path) as f:
+        header = f.readline()
+        time = float(header.split('@time=')[-1])
+        data = np.loadtxt(f)
+
+    x = data[:, 0]
+    h = data[:, 1]
+
+    # Sort by x for clean plotting
+    sort_idx = np.argsort(x)
+    x = x[sort_idx]
+    h = h[sort_idx]
+
     fig, ax = plt.subplots(figsize=(10, 6))
-    ax.plot(data['x'], data['h'], linestyle='-', color='black') 
-    ax.set_xlabel(r'$x$', fontsize=16)
-    ax.set_ylabel(r'$h$', fontsize=16)
-    ax.set_title('$t$ = %4.2f' % tt, fontsize=20)
-    # ax.axis('equal')  
-    
-    ax.set_xlim(-0.3, 0.3)
-    ax.set_ylim(0, 0.3)
-    
-    output_file_path = os.path.join(folder, f'{os.path.splitext(file)[0]}.png')
-    plt.savefig(output_file_path)
+    ax.plot(x, h, linestyle='-', color='black', linewidth=1.5)
+    ax.set_xlabel(r'$x$')
+    ax.set_ylabel(r'$h$')
+    ax.set_title(r'$t = %.2f$' % time)
+
+    # Zoom around bridge region
+    ax.set_xlim(-1, 1)
+    ax.set_ylim(0, 0.2)
+    ax.grid(True, alpha=0.3)
+
+    output_file = os.path.join(frame_dir, f'frame_{i:05d}.png')
+    plt.savefig(output_file, dpi=150, bbox_inches='tight')
     plt.close()
 
-    i = i + 1
+    if (i + 1) % 100 == 0:
+        print(f"  Processed {i + 1}/{len(files)} frames...")
 
-print("All files processed and plots saved.")
+print(f"All {len(files)} frames saved to '{frame_dir}/'")
+print(f"To make a video: ffmpeg -framerate 30 -i {frame_dir}/frame_%05d.png -c:v libx264 -pix_fmt yuv420p {base_folder}_video.mp4")
