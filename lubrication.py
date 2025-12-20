@@ -2,10 +2,10 @@ from pyoomph import *
 from pyoomph.expressions import *
 
 class LubricationEquations(Equations):
-	def __init__(self,Ca=1,Ma=1):
+	def __init__(self,Ma=1,Pe=1):
 		super(LubricationEquations, self).__init__()
-		self.Ca=Ca
 		self.Ma=Ma
+		self.Pe=Pe
 		
 	def define_fields(self):
 		self.define_scalar_field("h","C2")
@@ -16,9 +16,9 @@ class LubricationEquations(Equations):
 		h,eta=var_and_test("h")
 		p,q=var_and_test("p")
 		Gamma,phi=var_and_test("Gamma")
-		self.add_residual(weak(partial_t(h),eta) + weak((h**3/3*grad(p) - h**2/2*grad(Gamma)),grad(eta)))
-		self.add_residual(weak(self.Ca*p,q)-weak(grad(h) + self.Ca*Gamma*grad(h),grad(q)))
-		self.add_residual(weak(partial_t(Gamma),phi) - weak((h*Gamma*grad(Gamma) - h**2/2*Gamma*grad(p)) - 1/self.Ma*grad(Gamma),grad(phi)))
+		self.add_residual(weak(partial_t(h),eta) - weak((-h**3/3*grad(p) - self.Ma*h**2/2*grad(Gamma)),grad(eta)))
+		self.add_residual(weak(p,q)-weak(grad(h) - self.Ma*Gamma*grad(h),grad(q)))
+		self.add_residual(weak(partial_t(Gamma),phi) - weak((-self.Ma*h*Gamma*grad(Gamma) - h**2/2*Gamma*grad(p)) - 1/self.Pe*grad(Gamma),grad(phi)))
 		
 class LubricationProblem(Problem):	
 	def define_problem(self):
