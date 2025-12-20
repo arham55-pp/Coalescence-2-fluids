@@ -1,15 +1,43 @@
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 import sys
 from matplotlib.gridspec import GridSpec
 
-# Set up matplotlib parameters for nice plots
-plt.rcParams['figure.dpi'] = 150
-plt.rcParams['font.size'] = 10
-plt.rcParams['axes.labelsize'] = 12
-plt.rcParams['axes.titlesize'] = 14
-plt.rcParams['lines.linewidth'] = 1.5
+# Publication-quality matplotlib configuration
+matplotlib.rcParams['font.family'] = 'serif'
+matplotlib.rcParams['font.serif'] = ['Computer Modern Roman']
+matplotlib.rcParams['text.usetex'] = True
+matplotlib.rcParams['text.latex.preamble'] = r'\usepackage{amsmath}'
+matplotlib.rcParams['figure.dpi'] = 150
+matplotlib.rcParams['lines.linewidth'] = 2.5
+
+# Publication-quality settings (scaled for 10-12 inch figures)
+plt_settings = {
+    'LabelFont': 28,      # Axis labels
+    'AxesFont': 22,       # Tick labels
+    'TitleFont': 28,      # Plot titles
+    'LegendFont': 18,     # Legend entries
+    'ColorbarFont': 22,   # Colorbar labels
+}
+
+
+def style_axis(ax, xlabel=None, ylabel=None, title=None):
+    """Apply publication-quality styling to an axis."""
+    ax.tick_params(axis='both', which='major', labelsize=plt_settings['AxesFont'],
+                   width=2, length=8, direction='out', pad=8)
+    ax.tick_params(which='minor', width=1.5, length=4, direction='out')
+    for spine in ax.spines.values():
+        spine.set_linewidth(2)
+    ax.minorticks_on()
+    ax.grid(True, alpha=0.3, linewidth=1)
+    if xlabel:
+        ax.set_xlabel(xlabel, fontsize=plt_settings['LabelFont'], labelpad=10)
+    if ylabel:
+        ax.set_ylabel(ylabel, fontsize=plt_settings['LabelFont'], labelpad=10)
+    if title:
+        ax.set_title(title, fontsize=plt_settings['TitleFont'], pad=15)
 
 # Get base folder from command line, default to "coalescence_clean"
 base_folder = sys.argv[1] if len(sys.argv) > 1 else "coalescence_clean"
@@ -37,7 +65,7 @@ p_max_data = []
 
 # Plot 1: Height profile evolution at selected times
 print("Creating height evolution plot...")
-fig1, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
+fig1, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10), sharex=True)
 
 # Select files to plot (every 40th file, or fewer if not enough files)
 step = max(1, len(files) // 10)
@@ -59,21 +87,18 @@ for idx, file_idx in enumerate(range(0, len(files), step)):
         h = h[sort_idx]
         p = p[sort_idx]
 
-        ax1.plot(x, h, color=colors[idx], label=f't={time:.2f}')
+        ax1.plot(x, h, color=colors[idx], label=f'$t={time:.2f}$')
         ax2.plot(x, p, color=colors[idx])
 
-ax1.set_ylabel('Height $h$')
-title = 'Droplet Spreading Evolution' if is_spreading else 'Droplet Coalescence Evolution (Clean)'
-ax1.set_title(title)
-ax1.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-ax1.grid(True, alpha=0.3)
+title = r'Droplet Spreading Evolution' if is_spreading else r'Droplet Coalescence Evolution (Clean)'
+style_axis(ax1, ylabel=r'Height $h$', title=title)
+ax1.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=plt_settings['LegendFont'], frameon=False)
 
-ax2.set_xlabel('Position $x$' if not is_spreading else 'Radial position $r$')
-ax2.set_ylabel('Pressure $p$')
-ax2.grid(True, alpha=0.3)
+xlabel = r'Radial position $r$' if is_spreading else r'Position $x$'
+style_axis(ax2, xlabel=xlabel, ylabel=r'Pressure $p$')
 
 plt.tight_layout()
-plt.savefig(f'{plot_dir}/height_pressure_evolution.png', dpi=300, bbox_inches='tight')
+plt.savefig(f'{plot_dir}/height_pressure_evolution.pdf', dpi=300, bbox_inches='tight')
 plt.close()
 
 # Plot 2: Spacetime diagram of height
@@ -105,13 +130,14 @@ for i, f in enumerate(files[::2]):  # Use every other file for speed
 
 height_matrix = np.array(height_matrix)
 
-fig2, ax = plt.subplots(figsize=(10, 6))
+fig2, ax = plt.subplots(figsize=(12, 8))
 im = ax.pcolormesh(x_common, times, height_matrix, shading='auto', cmap='viridis')
-ax.set_xlabel('Position $x$' if not is_spreading else 'Radial position $r$')
-ax.set_ylabel('Time $t$')
-ax.set_title('Spacetime Evolution of Film Height')
-cbar = plt.colorbar(im, ax=ax, label='Height $h$')
-plt.savefig(f'{plot_dir}/spacetime_height.png', dpi=300, bbox_inches='tight')
+xlabel = r'Radial position $r$' if is_spreading else r'Position $x$'
+style_axis(ax, xlabel=xlabel, ylabel=r'Time $t$', title=r'Spacetime Evolution of Film Height')
+cbar = plt.colorbar(im, ax=ax)
+cbar.set_label(r'Height $h$', fontsize=plt_settings['ColorbarFont'], labelpad=10)
+cbar.ax.tick_params(labelsize=plt_settings['AxesFont'])
+plt.savefig(f'{plot_dir}/spacetime_height.pdf', dpi=300, bbox_inches='tight')
 plt.close()
 
 # Plot 3: Time series analysis
@@ -142,52 +168,41 @@ for f in files:
             h_center_data.append(h[center_idx])
         p_max_data.append(np.max(np.abs(p)))
 
-fig3 = plt.figure(figsize=(12, 8))
+fig3 = plt.figure(figsize=(14, 10))
 gs = GridSpec(2, 2, figure=fig3)
 
 ax1 = fig3.add_subplot(gs[0, :])
 if is_spreading:
-    ax1.plot(time_data, h_max_data, 'b-', label='Maximum height (center)')
-    ax1.set_ylabel('Maximum height')
-    ax1.set_title('Evolution of Droplet Height During Spreading')
+    ax1.plot(time_data, h_max_data, 'b-', linewidth=3, label='Maximum height (center)')
+    style_axis(ax1, xlabel=r'Time $t$', ylabel=r'Maximum height',
+               title=r'Evolution of Droplet Height During Spreading')
 else:
-    ax1.plot(time_data, h_min_data, 'b-', label='Minimum height (bridge)')
-    ax1.set_ylabel('Minimum height')
-    ax1.set_title('Evolution of Bridge Height During Coalescence')
-ax1.set_xlabel('Time $t$')
-ax1.grid(True, alpha=0.3)
-ax1.legend()
+    ax1.plot(time_data, h_min_data, 'b-', linewidth=3, label='Minimum height (bridge)')
+    style_axis(ax1, xlabel=r'Time $t$', ylabel=r'Minimum height',
+               title=r'Evolution of Bridge Height During Coalescence')
+ax1.legend(fontsize=plt_settings['LegendFont'], frameon=False)
 
 ax2 = fig3.add_subplot(gs[1, 0])
-ax2.plot(time_data, h_max_data, 'r-', label='Maximum height')
-ax2.plot(time_data, h_center_data, 'g--', label='Center height')
+ax2.plot(time_data, h_max_data, 'r-', linewidth=3, label='Maximum height')
+ax2.plot(time_data, h_center_data, 'g--', linewidth=3, label='Center height')
 if not is_spreading:
-    ax2.plot(time_data, h_min_data, 'b:', label='Minimum height')
-ax2.set_xlabel('Time $t$')
-ax2.set_ylabel('Height')
-ax2.set_title('Height Evolution at Different Positions')
-ax2.grid(True, alpha=0.3)
-ax2.legend()
+    ax2.plot(time_data, h_min_data, 'b:', linewidth=3, label='Minimum height')
+style_axis(ax2, xlabel=r'Time $t$', ylabel=r'Height',
+           title=r'Height Evolution at Different Positions')
+ax2.legend(fontsize=plt_settings['LegendFont'], frameon=False)
 
 ax3 = fig3.add_subplot(gs[1, 1])
-ax3.plot(time_data, p_max_data, 'm-')
-ax3.set_xlabel('Time $t$')
-ax3.set_ylabel('Max $|p|$')
-ax3.set_title('Maximum Pressure')
-ax3.grid(True, alpha=0.3)
+ax3.plot(time_data, p_max_data, 'm-', linewidth=3)
+style_axis(ax3, xlabel=r'Time $t$', ylabel=r'Max $|p|$',
+           title=r'Maximum Pressure')
 
 plt.tight_layout()
-plt.savefig(f'{plot_dir}/time_series_analysis.png', dpi=300, bbox_inches='tight')
+plt.savefig(f'{plot_dir}/time_series_analysis.pdf', dpi=300, bbox_inches='tight')
 plt.close()
 
 # Plot 4: Zoom on region of interest
 print("Creating zoom plot...")
-if is_spreading:
-    # For spreading: zoom on contact line region
-    fig4, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
-else:
-    # For coalescence: zoom on bridge region
-    fig4, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
+fig4, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10), sharex=True)
 
 # Plot at different stages
 stages = [0, len(files)//4, len(files)//2, 3*len(files)//4, len(files)-1]
@@ -216,55 +231,50 @@ for idx, (stage, color, label) in enumerate(zip(stages, colors, labels)):
             # For coalescence: zoom on bridge at x=0
             mask = np.abs(x) < 0.5
 
-        ax1.plot(x[mask], h[mask], color=color, label=f'{label} (t={time:.2f})')
-        ax2.plot(x[mask], p[mask], color=color)
+        ax1.plot(x[mask], h[mask], color=color, linewidth=3, label=f'{label} ($t={time:.2f}$)')
+        ax2.plot(x[mask], p[mask], color=color, linewidth=3)
 
-ax1.set_ylabel('Height $h$')
 if is_spreading:
-    ax1.set_title('Contact Line Region Evolution')
+    style_axis(ax1, ylabel=r'Height $h$', title=r'Contact Line Region Evolution')
 else:
-    ax1.set_title('Bridge Region Evolution During Coalescence')
-ax1.legend()
-ax1.grid(True, alpha=0.3)
+    style_axis(ax1, ylabel=r'Height $h$', title=r'Bridge Region Evolution During Coalescence')
+ax1.legend(fontsize=plt_settings['LegendFont'], frameon=False)
 
-ax2.set_xlabel('Position $x$' if not is_spreading else 'Radial position $r$')
-ax2.set_ylabel('Pressure $p$')
-ax2.grid(True, alpha=0.3)
+xlabel = r'Radial position $r$' if is_spreading else r'Position $x$'
+style_axis(ax2, xlabel=xlabel, ylabel=r'Pressure $p$')
 
 plt.tight_layout()
-plt.savefig(f'{plot_dir}/zoom_region.png', dpi=300, bbox_inches='tight')
+plt.savefig(f'{plot_dir}/zoom_region.pdf', dpi=300, bbox_inches='tight')
 plt.close()
 
 # Plot 5: Phase portrait (height dynamics)
 print("Creating phase portrait...")
-fig5, ax = plt.subplots(figsize=(8, 8))
+fig5, ax = plt.subplots(figsize=(10, 10))
 
 # Use color gradient for time
 colors = plt.cm.plasma(np.linspace(0, 1, len(time_data)))
 
 if is_spreading:
     # For spreading: max height vs max pressure
-    ax.scatter(h_max_data, p_max_data, c=colors, alpha=0.6, s=20)
-    ax.plot(h_max_data, p_max_data, 'k-', alpha=0.3, linewidth=0.5)
-    ax.set_xlabel('Maximum height')
-    ax.set_ylabel('Maximum $|p|$')
-    ax.set_title('Phase Portrait: Height vs Pressure')
+    ax.scatter(h_max_data, p_max_data, c=colors, alpha=0.7, s=80, edgecolors='w', linewidth=0.5, zorder=3)
+    ax.plot(h_max_data, p_max_data, 'k-', alpha=0.3, linewidth=1, zorder=2)
+    style_axis(ax, xlabel=r'Maximum height', ylabel=r'Maximum $|p|$',
+               title=r'Phase Portrait: Height vs Pressure')
 else:
     # For coalescence: min height vs max pressure
-    ax.scatter(h_min_data, p_max_data, c=colors, alpha=0.6, s=20)
-    ax.plot(h_min_data, p_max_data, 'k-', alpha=0.3, linewidth=0.5)
-    ax.set_xlabel('Minimum height (bridge)')
-    ax.set_ylabel('Maximum $|p|$')
-    ax.set_title('Phase Portrait: Bridge Height vs Pressure')
-
-ax.grid(True, alpha=0.3)
+    ax.scatter(h_min_data, p_max_data, c=colors, alpha=0.7, s=80, edgecolors='w', linewidth=0.5, zorder=3)
+    ax.plot(h_min_data, p_max_data, 'k-', alpha=0.3, linewidth=1, zorder=2)
+    style_axis(ax, xlabel=r'Minimum height (bridge)', ylabel=r'Maximum $|p|$',
+               title=r'Phase Portrait: Bridge Height vs Pressure')
 
 # Add colorbar for time
 sm = plt.cm.ScalarMappable(cmap=plt.cm.plasma, norm=plt.Normalize(vmin=time_data[0], vmax=time_data[-1]))
 sm.set_array([])
-cbar = plt.colorbar(sm, ax=ax, label='Time')
+cbar = plt.colorbar(sm, ax=ax)
+cbar.set_label(r'Time', fontsize=plt_settings['ColorbarFont'], labelpad=10)
+cbar.ax.tick_params(labelsize=plt_settings['AxesFont'])
 
-plt.savefig(f'{plot_dir}/phase_portrait.png', dpi=300, bbox_inches='tight')
+plt.savefig(f'{plot_dir}/phase_portrait.pdf', dpi=300, bbox_inches='tight')
 plt.close()
 
 # Plot 6: Contact line / bridge position over time (for spreading)
@@ -288,13 +298,11 @@ if is_spreading:
             else:
                 contact_positions.append(x[-1])
 
-    fig6, ax = plt.subplots(figsize=(10, 6))
-    ax.plot(time_data, contact_positions, 'b-', linewidth=2)
-    ax.set_xlabel('Time $t$')
-    ax.set_ylabel('Contact line position $r_c$')
-    ax.set_title('Contact Line Evolution During Spreading')
-    ax.grid(True, alpha=0.3)
-    plt.savefig(f'{plot_dir}/contact_line_position.png', dpi=300, bbox_inches='tight')
+    fig6, ax = plt.subplots(figsize=(12, 8))
+    ax.plot(time_data, contact_positions, 'b-', linewidth=3)
+    style_axis(ax, xlabel=r'Time $t$', ylabel=r'Contact line position $r_c$',
+               title=r'Contact Line Evolution During Spreading')
+    plt.savefig(f'{plot_dir}/contact_line_position.pdf', dpi=300, bbox_inches='tight')
     plt.close()
 
 print(f"\nAll plots have been saved to the '{plot_dir}' folder!")
