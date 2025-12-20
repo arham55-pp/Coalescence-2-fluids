@@ -93,7 +93,7 @@ style_axis(ax2, xlabel=r'Position $x$', ylabel=r'Surfactant concentration $\Gamm
 # Add colorbar for time
 sm = plt.cm.ScalarMappable(cmap='viridis', norm=plt.Normalize(vmin=time_values[0], vmax=time_values[-1]))
 sm.set_array([])
-cbar = fig1.colorbar(sm, ax=[ax1, ax2], location='right', shrink=0.8, pad=0.02)
+cbar = fig1.colorbar(sm, ax=[ax1, ax2], location='right', shrink=0.6, pad=0.08)
 cbar.set_label(r'Time $t$', fontsize=plt_settings['ColorbarFont'], labelpad=10)
 cbar.ax.tick_params(labelsize=plt_settings['AxesFont'])
 

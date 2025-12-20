@@ -65,17 +65,19 @@ p_max_data = []
 
 # Plot 1: Height profile evolution at selected times
 print("Creating height evolution plot...")
-fig1, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10), sharex=True)
+fig1, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 10), sharex=True, constrained_layout=True)
 
 # Select files to plot (every 40th file, or fewer if not enough files)
 step = max(1, len(files) // 10)
 selected_indices = range(0, len(files), step)
 colors = plt.cm.viridis(np.linspace(0, 1, len(list(selected_indices))))
 
+time_values = []
 for idx, file_idx in enumerate(range(0, len(files), step)):
     with open(os.path.join(output_dir, files[file_idx])) as f:
         header = f.readline()
         time = float(header.split('@time=')[-1])
+        time_values.append(time)
         data = np.loadtxt(f)
         x = data[:, 0]
         h = data[:, 1]
@@ -87,18 +89,23 @@ for idx, file_idx in enumerate(range(0, len(files), step)):
         h = h[sort_idx]
         p = p[sort_idx]
 
-        ax1.plot(x, h, color=colors[idx], label=f'$t={time:.2f}$')
+        ax1.plot(x, h, color=colors[idx])
         ax2.plot(x, p, color=colors[idx])
 
 title = r'Droplet Spreading Evolution' if is_spreading else r'Droplet Coalescence Evolution (Clean)'
 style_axis(ax1, ylabel=r'Height $h$', title=title)
-ax1.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=plt_settings['LegendFont'], frameon=False)
 
 xlabel = r'Radial position $r$' if is_spreading else r'Position $x$'
 style_axis(ax2, xlabel=xlabel, ylabel=r'Pressure $p$')
 
-plt.tight_layout()
-plt.savefig(f'{plot_dir}/height_pressure_evolution.pdf', dpi=300, bbox_inches='tight')
+# Add colorbar for time
+sm = plt.cm.ScalarMappable(cmap='viridis', norm=plt.Normalize(vmin=time_values[0], vmax=time_values[-1]))
+sm.set_array([])
+cbar = fig1.colorbar(sm, ax=[ax1, ax2], location='right', shrink=0.6, pad=0.08)
+cbar.set_label(r'Time $t$', fontsize=plt_settings['ColorbarFont'], labelpad=10)
+cbar.ax.tick_params(labelsize=plt_settings['AxesFont'])
+
+plt.savefig(f'{plot_dir}/height_pressure_evolution.pdf', dpi=300)
 plt.close()
 
 # Plot 2: Spacetime diagram of height
