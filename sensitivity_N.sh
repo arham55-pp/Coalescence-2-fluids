@@ -53,6 +53,13 @@ done
 
 echo ""
 echo "All simulations completed!"
+
+# Run convergence analysis
+echo ""
+echo "Running convergence analysis..."
+python check_convergence.py --N
+
+echo ""
 echo "Generating comparison plots..."
 
 # Create comparison plot using Python
