@@ -18,6 +18,9 @@ Key parameters:
 - `--Gamma0`: Initial surfactant concentration on left droplet
 - `--theta`: Contact angle in degrees
 - `--hp`: Precursor film thickness
+- `--Lx`: Domain size (default: 6.0, centered at x=0)
+- `--N`: Number of mesh elements (default: 1000)
+- `--output-dir`: Custom output directory (default: script name)
 
 ### Clean Coalescence (No Surfactant)
 ```bash
@@ -79,6 +82,18 @@ coalescence/
 ```
 
 The text files contain columns: `coordinate_x`, `h`, `p`, `Gamma` (or just h, p for clean cases), with a header line containing `@time=<value>`.
+
+## Sensitivity Analysis
+
+Scripts for numerical convergence studies (for paper validation):
+
+```bash
+./sensitivity_hp.sh   # Precursor film thickness: hp = 1e-4, 1e-3, 1e-2
+./sensitivity_Lx.sh   # Domain size: Lx = 6, 8, 10
+./sensitivity_N.sh    # Mesh resolution: N = 500, 1000, 2000
+```
+
+Each script runs three simulations, computes max relative differences in h₀(t), x₀(t), and x_f, and generates publication-quality comparison plots in `sensitivity_<param>_plots/`.
 
 ## Dependencies
 
