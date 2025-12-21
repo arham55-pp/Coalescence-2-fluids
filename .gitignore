@@ -20,7 +20,7 @@ output/
 _pyoomph/
 *.vtu
 *.pvd
-*_log
+*_log.*
 
 # also keep these files
 !*.py
