@@ -1,4 +1,6 @@
 import argparse
+import os
+import sys
 from pyoomph import *
 from pyoomph.expressions import *
 from pyoomph.meshes.meshdatacache import MeshDataEigenModes
@@ -74,6 +76,7 @@ class PlotterTry(MatplotlibPlotter):
 class DropletCoalescence(Problem):
 	def __init__(self, args):
 		super(DropletCoalescence, self).__init__()
+		self.quiet()  # suppress mesh refinement messages
 		# Geometry (see paper §2.1)
 		self.L = 1                      # contact line radius (length scale)
 		self.theta = args.theta * pi / 180  # contact angle (convert from degrees)
@@ -89,6 +92,16 @@ class DropletCoalescence(Problem):
 		self.Pe = args.Pe           # Péclet number
 		self.Gamma0 = args.Gamma0   # initial surfactant concentration
 		# self.plotter = PlotterTry(self)
+		self._step_count = 0
+		self._progress_interval = 100  # print progress every N timesteps
+
+	def actions_after_newton_solve(self):
+		self._step_count += 1
+		if self._step_count % self._progress_interval == 0:
+			t = float(self.get_current_time())
+			# Use stderr since stdout may be redirected
+			sys.stderr.write(f"\rt = {t:.2f}")
+			sys.stderr.flush()
 			
 					
 	def define_problem(self):
@@ -104,9 +117,14 @@ class DropletCoalescence(Problem):
 		eqs+=MeshFileOutput() # output	
 		x=var("coordinate")
 
-		h1=-self.R + self.H + (self.R**2 - (var("coordinate_x") + (2 * self.R * self.H - self.H**2)**(0.5))**2)**(0.5)
-		h2=-self.R + self.H + (self.R**2 - (var("coordinate_x") - (2 * self.R * self.H - self.H**2)**(0.5))**2)**(0.5)
-		h_init=h_init=maximum(maximum(h1,h2),self.hp) 
+		# Droplet centers at x = ±sqrt(2RH - H²)
+		x_center = (2 * self.R * self.H - self.H**2)**(0.5)
+		# Clamp sqrt arguments to avoid complex values outside droplet footprint
+		arg1 = maximum(0, self.R**2 - (var("coordinate_x") + x_center)**2)
+		arg2 = maximum(0, self.R**2 - (var("coordinate_x") - x_center)**2)
+		h1 = -self.R + self.H + arg1**(0.5)
+		h2 = -self.R + self.H + arg2**(0.5)
+		h_init = maximum(maximum(h1, h2), self.hp) 
 
 		# Surfactant IC: Γ = Γ₀ on left droplet (x<0), Γ = 0 on right droplet (x>0)
 		Gamma_init = self.Gamma0 * (0.5 - 0.5*tanh(var("coordinate_x") / self.hp))
@@ -127,4 +145,14 @@ if __name__=="__main__":
 	with DropletCoalescence(args) as problem:
 		if args.output_dir:
 			problem.set_output_directory(args.output_dir)
-		problem.run(100,outstep=0.1,startstep=0.01,maxstep=50,temporal_error=1,spatial_adapt=1)
+		# Redirect C-level stdout to suppress mesh refinement messages
+		# Progress updates go to stderr which remains visible
+		with open(os.devnull, 'w') as devnull:
+			old_stdout_fd = os.dup(1)
+			os.dup2(devnull.fileno(), 1)
+			try:
+				problem.run(100,outstep=0.1,startstep=0.01,maxstep=50,temporal_error=1,spatial_adapt=1)
+			finally:
+				os.dup2(old_stdout_fd, 1)
+				os.close(old_stdout_fd)
+		print("\nSimulation complete.")
