@@ -1,6 +1,6 @@
 #!/bin/bash
 # Sensitivity analysis for mesh resolution N
-# Varies N from 500, 1000, 2000 (N/2 < N < 2N) with default surfactant parameters
+# Runs 4 cases in parallel: 500, 1000, 2000, 4000 (mesh doubling study)
 
 set -e  # Exit on error
 
@@ -15,22 +15,22 @@ GAMMA0=0.8
 THETA=20
 HP=1e-4
 
-# Mesh resolution values to test (N/2, N, 2N where N=1000)
-N_VALUES=("500" "1000" "2000")
+# Mesh resolution values to test (4 values, doubling each time)
+N_VALUES=("500" "1000" "2000" "4000")
 
-# Run simulations
+# Clean up old output directories
+for N in "${N_VALUES[@]}"; do
+    rm -rf "sensitivity_N_${N}"
+done
+
+# Launch all simulations in parallel
+echo ""
+echo "Launching ${#N_VALUES[@]} simulations in parallel..."
+echo "----------------------------------------------"
+
+PIDS=()
 for N in "${N_VALUES[@]}"; do
     OUTDIR="sensitivity_N_${N}"
-
-    echo ""
-    echo "Running simulation with N = $N"
-    echo "Output directory: $OUTDIR"
-    echo "----------------------------------------------"
-
-    # Remove old output if exists
-    rm -rf "$OUTDIR"
-
-    # Run simulation with output directory
     python coalescence.py \
         --beta $BETA \
         --Pe $PE \
@@ -38,9 +38,17 @@ for N in "${N_VALUES[@]}"; do
         --theta $THETA \
         --hp $HP \
         --N $N \
-        --output-dir "$OUTDIR" 2>&1 | tee "${OUTDIR}_log.txt"
+        --output-dir "$OUTDIR" > "${OUTDIR}_log.txt" 2>&1 &
+    PIDS+=($!)
+    echo "Started N = $N (PID: $!)"
+done
 
-    echo "Completed simulation for N = $N"
+# Wait for all simulations to complete
+echo ""
+echo "Waiting for all simulations to complete..."
+for i in "${!PIDS[@]}"; do
+    wait ${PIDS[$i]}
+    echo "Completed N = ${N_VALUES[$i]}"
 done
 
 echo ""
@@ -86,10 +94,10 @@ def style_axis(ax, xlabel=None, ylabel=None, title=None):
     if title:
         ax.set_title(title, fontsize=plt_settings['TitleFont'], pad=15)
 
-# Mesh resolution values
-N_values = ['500', '1000', '2000']
-colors = ['#1f77b4', '#ff7f0e', '#2ca02c']  # Blue, Orange, Green
-labels = [r'$N = 500$', r'$N = 1000$', r'$N = 2000$']
+# Mesh resolution values (4 values)
+N_values = ['500', '1000', '2000', '4000']
+colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']  # Blue, Orange, Green, Red
+labels = [r'$N = 500$', r'$N = 1000$', r'$N = 2000$', r'$N = 4000$']
 
 # Create output directory for plots
 plot_dir = 'sensitivity_N_plots'
@@ -172,7 +180,7 @@ if '1000' in all_data:
     print(f"  Final x0 = {baseline['x0'][-1]:.6f}")
     print(f"  Final xf = {baseline['xf'][-1]:.6f}")
 
-    for N in ['500', '2000']:
+    for N in ['500', '2000', '4000']:
         if N in all_data:
             data = all_data[N]
             # Interpolate to common time points

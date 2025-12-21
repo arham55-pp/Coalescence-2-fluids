@@ -1,6 +1,6 @@
 #!/bin/bash
 # Sensitivity analysis for precursor film thickness h_infty
-# Varies hp from 1e-4, 1e-3, and 1e-2 with default surfactant parameters
+# Runs 4 cases in parallel: 1e-5, 1e-4, 1e-3, 1e-2
 
 set -e  # Exit on error
 
@@ -14,31 +14,48 @@ PE=1.0
 GAMMA0=0.8
 THETA=20
 
-# Precursor film values to test
-HP_VALUES=("1e-4" "1e-3" "1e-2")
+# Precursor film values to test (4 values, spanning 4 orders of magnitude)
+HP_VALUES=("1e-5" "1e-4" "1e-3" "1e-2")
 
-# Run simulations
+# Clean up old output directories
+for HP in "${HP_VALUES[@]}"; do
+    rm -rf "sensitivity_hp_${HP}"
+done
+
+# Launch all simulations in parallel
+echo ""
+echo "Launching ${#HP_VALUES[@]} simulations in parallel..."
+echo "----------------------------------------------"
+
+PIDS=()
 for HP in "${HP_VALUES[@]}"; do
     OUTDIR="sensitivity_hp_${HP}"
 
-    echo ""
-    echo "Running simulation with hp = $HP"
-    echo "Output directory: $OUTDIR"
-    echo "----------------------------------------------"
+    # Use finer mesh for thinner precursor film
+    if [ "$HP" = "1e-5" ]; then
+        N_CASE=2000
+    else
+        N_CASE=1000
+    fi
 
-    # Remove old output if exists
-    rm -rf "$OUTDIR"
-
-    # Run simulation with output directory
     python coalescence.py \
         --beta $BETA \
         --Pe $PE \
         --Gamma0 $GAMMA0 \
         --theta $THETA \
         --hp $HP \
-        --output-dir "$OUTDIR" 2>&1 | tee "${OUTDIR}_log.txt"
+        --N $N_CASE \
+        --output-dir "$OUTDIR" > "${OUTDIR}_log.txt" 2>&1 &
+    PIDS+=($!)
+    echo "Started hp = $HP with N = $N_CASE (PID: $!)"
+done
 
-    echo "Completed simulation for hp = $HP"
+# Wait for all simulations to complete
+echo ""
+echo "Waiting for all simulations to complete..."
+for i in "${!PIDS[@]}"; do
+    wait ${PIDS[$i]}
+    echo "Completed hp = ${HP_VALUES[$i]}"
 done
 
 echo ""
@@ -84,10 +101,10 @@ def style_axis(ax, xlabel=None, ylabel=None, title=None):
     if title:
         ax.set_title(title, fontsize=plt_settings['TitleFont'], pad=15)
 
-# Precursor film values
-hp_values = ['1e-4', '1e-3', '1e-2']
-colors = ['#1f77b4', '#ff7f0e', '#2ca02c']  # Blue, Orange, Green
-labels = [r'$h_\infty = 10^{-4}$', r'$h_\infty = 10^{-3}$', r'$h_\infty = 10^{-2}$']
+# Precursor film values (4 values)
+hp_values = ['1e-5', '1e-4', '1e-3', '1e-2']
+colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']  # Blue, Orange, Green, Red
+labels = [r'$h_\infty = 10^{-5}$', r'$h_\infty = 10^{-4}$', r'$h_\infty = 10^{-3}$', r'$h_\infty = 10^{-2}$']
 
 # Create output directory for plots
 plot_dir = 'sensitivity_hp_plots'
@@ -170,7 +187,7 @@ if '1e-4' in all_data:
     print(f"  Final x0 = {baseline['x0'][-1]:.6f}")
     print(f"  Final xf = {baseline['xf'][-1]:.6f}")
 
-    for hp in ['1e-3', '1e-2']:
+    for hp in ['1e-5', '1e-3', '1e-2']:
         if hp in all_data:
             data = all_data[hp]
             # Interpolate to common time points

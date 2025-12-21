@@ -1,6 +1,6 @@
 #!/bin/bash
 # Sensitivity analysis for domain size Lx
-# Varies domain from 6, 8, 10 with default surfactant parameters
+# Runs 4 cases in parallel: 6, 8, 10, 12
 
 set -e  # Exit on error
 
@@ -15,22 +15,22 @@ GAMMA0=0.8
 THETA=20
 HP=1e-4
 
-# Domain size values to test
-LX_VALUES=("6" "8" "10")
+# Domain size values to test (4 values)
+LX_VALUES=("6" "8" "10" "12")
 
-# Run simulations
+# Clean up old output directories
+for LX in "${LX_VALUES[@]}"; do
+    rm -rf "sensitivity_Lx_${LX}"
+done
+
+# Launch all simulations in parallel
+echo ""
+echo "Launching ${#LX_VALUES[@]} simulations in parallel..."
+echo "----------------------------------------------"
+
+PIDS=()
 for LX in "${LX_VALUES[@]}"; do
     OUTDIR="sensitivity_Lx_${LX}"
-
-    echo ""
-    echo "Running simulation with Lx = $LX"
-    echo "Output directory: $OUTDIR"
-    echo "----------------------------------------------"
-
-    # Remove old output if exists
-    rm -rf "$OUTDIR"
-
-    # Run simulation with output directory
     python coalescence.py \
         --beta $BETA \
         --Pe $PE \
@@ -38,9 +38,17 @@ for LX in "${LX_VALUES[@]}"; do
         --theta $THETA \
         --hp $HP \
         --Lx $LX \
-        --output-dir "$OUTDIR" 2>&1 | tee "${OUTDIR}_log.txt"
+        --output-dir "$OUTDIR" > "${OUTDIR}_log.txt" 2>&1 &
+    PIDS+=($!)
+    echo "Started Lx = $LX (PID: $!)"
+done
 
-    echo "Completed simulation for Lx = $LX"
+# Wait for all simulations to complete
+echo ""
+echo "Waiting for all simulations to complete..."
+for i in "${!PIDS[@]}"; do
+    wait ${PIDS[$i]}
+    echo "Completed Lx = ${LX_VALUES[$i]}"
 done
 
 echo ""
@@ -86,10 +94,10 @@ def style_axis(ax, xlabel=None, ylabel=None, title=None):
     if title:
         ax.set_title(title, fontsize=plt_settings['TitleFont'], pad=15)
 
-# Domain size values
-Lx_values = ['6', '8', '10']
-colors = ['#1f77b4', '#ff7f0e', '#2ca02c']  # Blue, Orange, Green
-labels = [r'$L_x = 6$', r'$L_x = 8$', r'$L_x = 10$']
+# Domain size values (4 values)
+Lx_values = ['6', '8', '10', '12']
+colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']  # Blue, Orange, Green, Red
+labels = [r'$L_x = 6$', r'$L_x = 8$', r'$L_x = 10$', r'$L_x = 12$']
 
 # Create output directory for plots
 plot_dir = 'sensitivity_Lx_plots'
@@ -172,7 +180,7 @@ if '6' in all_data:
     print(f"  Final x0 = {baseline['x0'][-1]:.6f}")
     print(f"  Final xf = {baseline['xf'][-1]:.6f}")
 
-    for Lx in ['8', '10']:
+    for Lx in ['8', '10', '12']:
         if Lx in all_data:
             data = all_data[Lx]
             # Interpolate to common time points
