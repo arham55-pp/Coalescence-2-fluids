@@ -1,16 +1,42 @@
 #!/bin/bash
 # Sensitivity analysis for mesh resolution N
 # Runs 4 cases in parallel: 500, 1000, 2000, 4000 (mesh doubling study)
+#
+# Usage: ./sensitivity_N.sh [--Pe VALUE] [--beta VALUE]
+#   --Pe VALUE    Péclet number (default: 1.0)
+#   --beta VALUE  Surfactant strength (default: 0.1)
 
 set -e  # Exit on error
 
-echo "=============================================="
-echo "Sensitivity Analysis: Mesh Resolution"
-echo "=============================================="
-
-# Default surfactant parameters
+# Default physical parameters (can be overridden via command line)
 BETA=0.1
 PE=1.0
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --Pe)
+            PE="$2"
+            shift 2
+            ;;
+        --beta)
+            BETA="$2"
+            shift 2
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Usage: $0 [--Pe VALUE] [--beta VALUE]"
+            exit 1
+            ;;
+    esac
+done
+
+echo "=============================================="
+echo "Sensitivity Analysis: Mesh Resolution"
+echo "Physical parameters: Pe=$PE, beta=$BETA"
+echo "=============================================="
+
+# Fixed parameters for this study
 GAMMA0=0.8
 THETA=20
 HP=1e-4
@@ -57,7 +83,7 @@ echo "All simulations completed!"
 # Run convergence analysis
 echo ""
 echo "Running convergence analysis..."
-python check_convergence.py --N
+python check_convergence.py --N --Pe $PE --beta $BETA
 
 echo ""
 echo "Generating comparison plots..."
@@ -123,9 +149,11 @@ for N, color, label in zip(N_values, colors, labels):
     files = sorted([f for f in os.listdir(domain_dir) if f.endswith('.txt')])
 
     time_data = []
-    h0_data = []      # Bridge height at x=0 (minimum height)
-    x0_data = []      # Position of minimum height
-    xf_data = []      # Surfactant front position
+    h0_data = []      # Neck height (min in bridge region |x| < 1.5)
+    x0_data = []      # Position of neck minimum
+    xe_data = []      # Drop edge position (where h drops below threshold)
+
+    hp = 1e-4  # Precursor film thickness for this study
 
     for f in files:
         with open(os.path.join(domain_dir, f)) as file:
@@ -135,42 +163,39 @@ for N, color, label in zip(N_values, colors, labels):
 
             x = data[:, 0]
             h = data[:, 1]
-            gamma = data[:, 3] if data.shape[1] > 3 else np.zeros_like(h)
 
-            # h0: minimum height (bridge height)
-            h0 = np.min(h)
+            # Restrict to bridge region (|x| < 1.5) to exclude precursor film
+            bridge_mask = np.abs(x) < 1.5
+            x_bridge = x[bridge_mask]
+            h_bridge = h[bridge_mask]
 
-            # x0: position of minimum height
-            x0 = x[np.argmin(h)]
+            # h0: neck height (minimum in bridge region)
+            h0 = np.min(h_bridge)
 
-            # xf: surfactant front position (where Gamma drops to 0.5*Gamma_max)
-            gamma_max = np.max(gamma)
-            if gamma_max > 0.01:
-                # Find where gamma crosses 0.5 * initial value (0.8 * 0.5 = 0.4)
-                threshold = 0.4
-                above_threshold = gamma > threshold
-                if np.any(above_threshold) and np.any(~above_threshold):
-                    # Find rightmost crossing point
-                    crossings = np.where(np.diff(above_threshold.astype(int)) == -1)[0]
-                    if len(crossings) > 0:
-                        xf = x[crossings[-1]]
-                    else:
-                        xf = x[np.argmax(x[above_threshold])]
-                else:
-                    xf = 0.0
+            # x0: position of neck minimum
+            x0 = x_bridge[np.argmin(h_bridge)]
+
+            # xe: drop edge (where h drops below threshold on right side)
+            threshold = max(2 * hp, 0.01)
+            right_mask = x > 0
+            h_right = h[right_mask]
+            x_right = x[right_mask]
+            below = h_right < threshold
+            if np.any(below):
+                xe = x_right[np.argmax(below)]
             else:
-                xf = 0.0
+                xe = x_right[-1]
 
             time_data.append(time)
             h0_data.append(h0)
             x0_data.append(x0)
-            xf_data.append(xf)
+            xe_data.append(xe)
 
     all_data[N] = {
         'time': np.array(time_data),
         'h0': np.array(h0_data),
         'x0': np.array(x0_data),
-        'xf': np.array(xf_data),
+        'xe': np.array(xe_data),
         'color': color,
         'label': label
     }
@@ -185,7 +210,7 @@ if '1000' in all_data:
     print(f"\nBaseline: N = 1000")
     print(f"  Final h0 = {baseline['h0'][-1]:.6f}")
     print(f"  Final x0 = {baseline['x0'][-1]:.6f}")
-    print(f"  Final xf = {baseline['xf'][-1]:.6f}")
+    print(f"  Final xe = {baseline['xe'][-1]:.6f}")
 
     for N in ['500', '2000', '4000']:
         if N in all_data:
@@ -196,21 +221,21 @@ if '1000' in all_data:
             h0_test = np.interp(t_common, data['time'], data['h0'])
             x0_base = np.interp(t_common, baseline['time'], baseline['x0'])
             x0_test = np.interp(t_common, data['time'], data['x0'])
-            xf_base = np.interp(t_common, baseline['time'], baseline['xf'])
-            xf_test = np.interp(t_common, data['time'], data['xf'])
+            xe_base = np.interp(t_common, baseline['time'], baseline['xe'])
+            xe_test = np.interp(t_common, data['time'], data['xe'])
 
             # Max relative difference
             h0_diff = np.max(np.abs(h0_test - h0_base) / (np.abs(h0_base) + 1e-10)) * 100
             x0_diff = np.max(np.abs(x0_test - x0_base) / (np.abs(x0_base) + 1e-10)) * 100
-            xf_diff = np.max(np.abs(xf_test - xf_base) / (np.abs(xf_base) + 1e-10)) * 100
+            xe_diff = np.max(np.abs(xe_test - xe_base) / (np.abs(xe_base) + 1e-10)) * 100
 
             print(f"\nN = {N}:")
             print(f"  Final h0 = {data['h0'][-1]:.6f}")
             print(f"  Final x0 = {data['x0'][-1]:.6f}")
-            print(f"  Final xf = {data['xf'][-1]:.6f}")
+            print(f"  Final xe = {data['xe'][-1]:.6f}")
             print(f"  Max relative difference in h0: {h0_diff:.2f}%")
             print(f"  Max relative difference in x0: {x0_diff:.2f}%")
-            print(f"  Max relative difference in xf: {xf_diff:.2f}%")
+            print(f"  Max relative difference in xe: {xe_diff:.2f}%")
 
 # Plot 1: Bridge height h0(t)
 fig1, ax1 = plt.subplots(figsize=(10, 8))
@@ -236,16 +261,16 @@ plt.tight_layout()
 plt.savefig(f'{plot_dir}/x0_vs_time.pdf', dpi=300, bbox_inches='tight')
 plt.close()
 
-# Plot 3: Surfactant front position xf(t)
+# Plot 3: Drop edge position xe(t)
 fig3, ax3 = plt.subplots(figsize=(10, 8))
 for N, data in all_data.items():
-    ax3.plot(data['time'], data['xf'], color=data['color'], label=data['label'], linewidth=2.5)
-style_axis(ax3, xlabel=r'Time $t$', ylabel=r'Surfactant front position $x_f$',
-           title=r'Sensitivity to Mesh Resolution: $x_f(t)$')
+    ax3.plot(data['time'], data['xe'], color=data['color'], label=data['label'], linewidth=2.5)
+style_axis(ax3, xlabel=r'Time $t$', ylabel=r'Drop edge $x_e$',
+           title=r'Sensitivity to Mesh Resolution: $x_e(t)$')
 ax3.legend(fontsize=plt_settings['LegendFont'], frameon=False)
 ax3.set_xlim(left=0)
 plt.tight_layout()
-plt.savefig(f'{plot_dir}/xf_vs_time.pdf', dpi=300, bbox_inches='tight')
+plt.savefig(f'{plot_dir}/xe_vs_time.pdf', dpi=300, bbox_inches='tight')
 plt.close()
 
 # Plot 4: Combined 3-panel plot
@@ -253,12 +278,12 @@ fig4, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 14), sharex=True)
 for N, data in all_data.items():
     ax1.plot(data['time'], data['h0'], color=data['color'], label=data['label'], linewidth=2.5)
     ax2.plot(data['time'], data['x0'], color=data['color'], linewidth=2.5)
-    ax3.plot(data['time'], data['xf'], color=data['color'], linewidth=2.5)
+    ax3.plot(data['time'], data['xe'], color=data['color'], linewidth=2.5)
 
 style_axis(ax1, ylabel=r'$h_0$', title=r'Sensitivity to Mesh Resolution $N$')
 ax1.legend(fontsize=plt_settings['LegendFont'], frameon=False, loc='upper left')
 style_axis(ax2, ylabel=r'$x_0$')
-style_axis(ax3, xlabel=r'Time $t$', ylabel=r'$x_f$')
+style_axis(ax3, xlabel=r'Time $t$', ylabel=r'$x_e$')
 ax3.set_xlim(left=0)
 plt.tight_layout()
 plt.savefig(f'{plot_dir}/sensitivity_N_combined.pdf', dpi=300, bbox_inches='tight')
@@ -267,6 +292,19 @@ plt.close()
 print(f"\nPlots saved to '{plot_dir}/' directory")
 PYTHON_SCRIPT
 
+# Run postprocessing for each individual case
+echo ""
+echo "Running postprocessing for each case..."
+for N in "${N_VALUES[@]}"; do
+    OUTDIR="sensitivity_N_${N}"
+    echo "  Postprocessing $OUTDIR..."
+    python postprocess.py "$OUTDIR"
+done
+
 echo ""
 echo "Sensitivity analysis complete!"
-echo "Results saved to sensitivity_N_plots/"
+echo "Results saved to:"
+echo "  - sensitivity_N_plots/ (comparison plots)"
+for N in "${N_VALUES[@]}"; do
+    echo "  - sensitivity_N_${N}_plots/ (individual case plots)"
+done
