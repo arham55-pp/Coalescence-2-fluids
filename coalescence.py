@@ -35,6 +35,8 @@ def parse_args():
                         help="Number of mesh elements")
     parser.add_argument("--max-refinement-level", type=int, default=6,
                         help="Max adaptive mesh refinement level")
+    parser.add_argument("--output-dir", type=str, default=None,
+                        help="Output directory (default: script name)")
     return parser.parse_args()
 
 
@@ -53,6 +55,8 @@ def print_parameters(args):
     print(f"  Lx (domain size)   = {args.Lx}")
     print(f"  N (elements)       = {args.N}")
     print(f"  max_refinement     = {args.max_refinement_level}")
+    if args.output_dir:
+        print(f"  output_dir         = {args.output_dir}")
     print("="*60 + "\n")
 
 class PlotterTry(MatplotlibPlotter):
@@ -88,7 +92,8 @@ class DropletCoalescence(Problem):
 			
 					
 	def define_problem(self):
-		self.add_mesh(LineMesh(minimum=-3, size=self.Lx, N=self.N)) 
+		# Domain is centered at x=0, spanning [-Lx/2, Lx/2]
+		self.add_mesh(LineMesh(minimum=-self.Lx/2, size=self.Lx, N=self.N)) 
 		
 		h=var("h") 
 		Gamma=var("Gamma")
@@ -120,4 +125,6 @@ if __name__=="__main__":
 	args = parse_args()
 	print_parameters(args)
 	with DropletCoalescence(args) as problem:
+		if args.output_dir:
+			problem.set_output_directory(args.output_dir)
 		problem.run(100,outstep=0.1,startstep=0.01,maxstep=50,temporal_error=1,spatial_adapt=1)
