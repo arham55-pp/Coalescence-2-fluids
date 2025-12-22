@@ -34,19 +34,18 @@ python spreading_clean.py
 
 ## Postprocessing
 
+### Analysis Plots
 ```bash
-# Generate analysis plots for surfactant simulation
-python postprocess.py coalescence
+python postprocess.py coalescence           # Surfactant case
+python postprocess_clean.py coalescence_clean   # Clean coalescence
+python postprocess_clean.py spreading_clean     # Spreading case
+```
 
-# Generate plots for clean simulation
-python postprocess_clean.py coalescence_clean
+Output goes to `{base_folder}_plots/` with 5 publication-quality PDFs: height evolution, spacetime diagram, time series analysis, bridge region zoom, and neck trajectory.
 
-# Generate plots for spreading simulation
-python postprocess_clean.py spreading_clean
-
-# Generate video frames
+### Video Generation
+```bash
 python make_video-interfaceOnly.py coalescence
-# Then create video:
 ffmpeg -framerate 30 -i coalescence_frames/frame_%05d.png -c:v libx264 -pix_fmt yuv420p coalescence_video.mp4
 ```
 
@@ -60,6 +59,13 @@ ffmpeg -framerate 30 -i coalescence_frames/frame_%05d.png -c:v libx264 -pix_fmt 
 - **`coalescence.py`** → `DropletCoalescence`: Two spherical-cap droplets with surfactant initially on left droplet only
 - **`coalescence_clean.py`** → `DropletCoalescence`: Same geometry, no surfactant
 - **`spreading_clean.py`** → `DropletSpreading`: Single droplet spreading with disjoining pressure (axisymmetric)
+
+### Shared Utilities
+**`postprocess_functions.py`** provides shared analysis functions used by all postprocessing and convergence scripts:
+- `style_axis(ax, xlabel, ylabel, title)`: Publication-quality axis styling (2pt spines, minor ticks, 0.3 alpha grid)
+- `find_neck(x, h)`: Finds coalescence neck (local minimum closest to x=0) using `scipy.signal.find_peaks` with prominence filtering
+- `find_drop_edge(x, h, hp, side)`: Finds drop edge position where h drops below threshold (2×hp or 0.01)
+- `plt_settings`: Font size configuration dict for labels, axes, titles, legends, colorbars
 
 ### Physics Details
 The lubrication equations (from paper §2.1-2.2):
@@ -85,18 +91,33 @@ The text files contain columns: `coordinate_x`, `h`, `p`, `Gamma` (or just h, p 
 
 ## Sensitivity Analysis
 
-Scripts for numerical convergence studies (for paper validation):
+Scripts for numerical convergence studies (4 values each, run in parallel):
 
 ```bash
-./sensitivity_hp.sh   # Precursor film thickness: hp = 1e-4, 1e-3, 1e-2
-./sensitivity_Lx.sh   # Domain size: Lx = 6, 8, 10
-./sensitivity_N.sh    # Mesh resolution: N = 500, 1000, 2000
+./sensitivity_hp.sh   # Precursor film: hp = 1e-5, 1e-4, 1e-3, 1e-2
+./sensitivity_Lx.sh   # Domain size: Lx = 6, 8, 10, 12
+./sensitivity_N.sh    # Mesh resolution: N = 500, 1000, 2000, 4000
 ```
 
-Each script runs three simulations, computes max relative differences in h₀(t), x₀(t), and x_f, and generates publication-quality comparison plots in `sensitivity_<param>_plots/`.
+Each script:
+1. Runs 4 simulations in parallel
+2. Calls `check_convergence.py` for quantitative analysis
+3. Generates comparison plots in `sensitivity_<param>_plots/`
+4. Runs individual postprocessing for each case
+
+### Convergence Analysis Tool
+```bash
+python check_convergence.py --hp    # Precursor film sensitivity
+python check_convergence.py --Lx    # Domain size sensitivity
+python check_convergence.py --N     # Mesh resolution sensitivity
+python check_convergence.py --all   # All checks
+python check_convergence.py --Lx --beta 0.2 --Pe 10  # Custom parameters
+```
+
+Outputs a formatted table with RMS% and Max% differences for h₀(t), x₀(t), and xₑ(t) relative to baseline, saved to `check-convergence-Pe{Pe}_beta{beta}-{param}.txt`.
 
 ## Dependencies
 
 - pyoomph (finite element framework)
-- numpy, matplotlib (postprocessing)
+- numpy, scipy, matplotlib (postprocessing)
 - ffmpeg (video creation, optional)
