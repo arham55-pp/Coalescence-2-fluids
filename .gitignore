@@ -20,6 +20,7 @@ _pyoomph/
 *.vtu
 *.pvd
 *_log.*
+*.mp4
 
 # also keep these files
 !*.py

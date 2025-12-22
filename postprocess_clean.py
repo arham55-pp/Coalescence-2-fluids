@@ -1,43 +1,9 @@
-import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 import sys
 from matplotlib.gridspec import GridSpec
-
-# Publication-quality matplotlib configuration
-matplotlib.rcParams['font.family'] = 'serif'
-matplotlib.rcParams['font.serif'] = ['Computer Modern Roman']
-matplotlib.rcParams['text.usetex'] = True
-matplotlib.rcParams['text.latex.preamble'] = r'\usepackage{amsmath}'
-matplotlib.rcParams['figure.dpi'] = 150
-matplotlib.rcParams['lines.linewidth'] = 2.5
-
-# Publication-quality settings (scaled for 10-12 inch figures)
-plt_settings = {
-    'LabelFont': 28,      # Axis labels
-    'AxesFont': 22,       # Tick labels
-    'TitleFont': 28,      # Plot titles
-    'LegendFont': 18,     # Legend entries
-    'ColorbarFont': 22,   # Colorbar labels
-}
-
-
-def style_axis(ax, xlabel=None, ylabel=None, title=None):
-    """Apply publication-quality styling to an axis."""
-    ax.tick_params(axis='both', which='major', labelsize=plt_settings['AxesFont'],
-                   width=2, length=8, direction='out', pad=8)
-    ax.tick_params(which='minor', width=1.5, length=4, direction='out')
-    for spine in ax.spines.values():
-        spine.set_linewidth(2)
-    ax.minorticks_on()
-    ax.grid(True, alpha=0.3, linewidth=1)
-    if xlabel:
-        ax.set_xlabel(xlabel, fontsize=plt_settings['LabelFont'], labelpad=10)
-    if ylabel:
-        ax.set_ylabel(ylabel, fontsize=plt_settings['LabelFont'], labelpad=10)
-    if title:
-        ax.set_title(title, fontsize=plt_settings['TitleFont'], pad=15)
+from postprocess_functions import plt_settings, style_axis, find_neck, find_drop_edge
 
 # Get base folder from command line, default to "coalescence_clean"
 base_folder = sys.argv[1] if len(sys.argv) > 1 else "coalescence_clean"
@@ -58,7 +24,8 @@ print(f"Mode: {'Spreading (axisymmetric)' if is_spreading else 'Coalescence'}")
 
 # Initialize lists for time series data
 time_data = []
-h_min_data = []
+h0_data = []       # neck height (coalescence) or max height (spreading)
+x0_data = []       # neck position (coalescence only)
 h_max_data = []
 h_center_data = []
 p_max_data = []
@@ -165,43 +132,65 @@ for f in files:
         p = p[sort_idx]
 
         time_data.append(time)
-        h_min_data.append(np.min(h))
         h_max_data.append(np.max(h))
-        # For coalescence, center is at x=0; for spreading, center is at r=0
+        p_max_data.append(np.max(np.abs(p)))
+
         if is_spreading:
+            # For spreading: track max height and center height
+            h0_data.append(np.max(h))
+            x0_data.append(0.0)  # not used for spreading
             h_center_data.append(h[0])  # r=0 is first point
         else:
-            center_idx = np.argmin(np.abs(x))  # closest to x=0
+            # For coalescence: use find_neck for robust neck detection
+            x0, h0 = find_neck(x, h)
+            x0_data.append(x0)
+            h0_data.append(h0)
+            center_idx = np.argmin(np.abs(x))
             h_center_data.append(h[center_idx])
-        p_max_data.append(np.max(np.abs(p)))
 
 fig3 = plt.figure(figsize=(14, 10))
 gs = GridSpec(2, 2, figure=fig3)
 
-ax1 = fig3.add_subplot(gs[0, :])
 if is_spreading:
+    # Spreading mode: original layout
+    ax1 = fig3.add_subplot(gs[0, :])
     ax1.plot(time_data, h_max_data, 'b-', linewidth=3, label='Maximum height (center)')
     style_axis(ax1, xlabel=r'Time $t$', ylabel=r'Maximum height',
                title=r'Evolution of Droplet Height During Spreading')
+    ax1.legend(fontsize=plt_settings['LegendFont'], frameon=False)
+
+    ax2 = fig3.add_subplot(gs[1, 0])
+    ax2.plot(time_data, h_max_data, 'r-', linewidth=3, label='Maximum height')
+    ax2.plot(time_data, h_center_data, 'g--', linewidth=3, label='Center height')
+    style_axis(ax2, xlabel=r'Time $t$', ylabel=r'Height',
+               title=r'Height Evolution at Different Positions')
+    ax2.legend(fontsize=plt_settings['LegendFont'], frameon=False)
+
+    ax3 = fig3.add_subplot(gs[1, 1])
+    ax3.plot(time_data, p_max_data, 'm-', linewidth=3)
+    style_axis(ax3, xlabel=r'Time $t$', ylabel=r'Max $|p|$',
+               title=r'Maximum Pressure')
 else:
-    ax1.plot(time_data, h_min_data, 'b-', linewidth=3, label='Minimum height (bridge)')
-    style_axis(ax1, xlabel=r'Time $t$', ylabel=r'Minimum height',
-               title=r'Evolution of Bridge Height During Coalescence')
-ax1.legend(fontsize=plt_settings['LegendFont'], frameon=False)
+    # Coalescence mode: 2x2 grid with h0, x0, h_max, p_max
+    ax1 = fig3.add_subplot(gs[0, 0])
+    ax1.plot(time_data, h0_data, 'b-', linewidth=3)
+    style_axis(ax1, xlabel=r'Time $t$', ylabel=r'Neck height $h_0$',
+               title=r'Neck Height Evolution')
 
-ax2 = fig3.add_subplot(gs[1, 0])
-ax2.plot(time_data, h_max_data, 'r-', linewidth=3, label='Maximum height')
-ax2.plot(time_data, h_center_data, 'g--', linewidth=3, label='Center height')
-if not is_spreading:
-    ax2.plot(time_data, h_min_data, 'b:', linewidth=3, label='Minimum height')
-style_axis(ax2, xlabel=r'Time $t$', ylabel=r'Height',
-           title=r'Height Evolution at Different Positions')
-ax2.legend(fontsize=plt_settings['LegendFont'], frameon=False)
+    ax2 = fig3.add_subplot(gs[0, 1])
+    ax2.plot(time_data, x0_data, 'g-', linewidth=3)
+    style_axis(ax2, xlabel=r'Time $t$', ylabel=r'Neck position $x_0$',
+               title=r'Neck Position Evolution')
 
-ax3 = fig3.add_subplot(gs[1, 1])
-ax3.plot(time_data, p_max_data, 'm-', linewidth=3)
-style_axis(ax3, xlabel=r'Time $t$', ylabel=r'Max $|p|$',
-           title=r'Maximum Pressure')
+    ax3 = fig3.add_subplot(gs[1, 0])
+    ax3.plot(time_data, h_max_data, 'r-', linewidth=3)
+    style_axis(ax3, xlabel=r'Time $t$', ylabel=r'Maximum height $h_{\max}$',
+               title=r'Maximum Height Evolution')
+
+    ax4 = fig3.add_subplot(gs[1, 1])
+    ax4.plot(time_data, p_max_data, 'm-', linewidth=3)
+    style_axis(ax4, xlabel=r'Time $t$', ylabel=r'Max $|p|$',
+               title=r'Maximum Pressure')
 
 plt.tight_layout()
 plt.savefig(f'{plot_dir}/time_series_analysis.pdf', dpi=300, bbox_inches='tight')
@@ -267,21 +256,31 @@ if is_spreading:
     ax.plot(h_max_data, p_max_data, 'k-', alpha=0.3, linewidth=1, zorder=2)
     style_axis(ax, xlabel=r'Maximum height', ylabel=r'Maximum $|p|$',
                title=r'Phase Portrait: Height vs Pressure')
+    output_name = 'phase_portrait.pdf'
 else:
-    # For coalescence: min height vs max pressure
-    ax.scatter(h_min_data, p_max_data, c=colors, alpha=0.7, s=80, edgecolors='w', linewidth=0.5, zorder=3)
-    ax.plot(h_min_data, p_max_data, 'k-', alpha=0.3, linewidth=1, zorder=2)
-    style_axis(ax, xlabel=r'Minimum height (bridge)', ylabel=r'Maximum $|p|$',
-               title=r'Phase Portrait: Bridge Height vs Pressure')
+    # For coalescence: neck trajectory (x0 vs h0)
+    ax.scatter(x0_data, h0_data, c=colors, alpha=0.7, s=80, edgecolors='w', linewidth=0.5, zorder=3)
+    ax.plot(x0_data, h0_data, 'k-', alpha=0.3, linewidth=1, zorder=2)
+
+    # Add arrows to show direction
+    arrow_indices = np.linspace(0, len(x0_data)-2, 10, dtype=int)
+    for idx in arrow_indices:
+        ax.annotate('', xy=(x0_data[idx+1], h0_data[idx+1]),
+                    xytext=(x0_data[idx], h0_data[idx]),
+                    arrowprops=dict(arrowstyle='->', color='black', alpha=0.5, lw=2))
+
+    style_axis(ax, xlabel=r'Neck position $x_0$', ylabel=r'Neck height $h_0$',
+               title=r'Neck Trajectory During Coalescence')
+    output_name = 'neck_trajectory.pdf'
 
 # Add colorbar for time
 sm = plt.cm.ScalarMappable(cmap=plt.cm.plasma, norm=plt.Normalize(vmin=time_data[0], vmax=time_data[-1]))
 sm.set_array([])
 cbar = plt.colorbar(sm, ax=ax)
-cbar.set_label(r'Time', fontsize=plt_settings['ColorbarFont'], labelpad=10)
+cbar.set_label(r'Time $t$', fontsize=plt_settings['ColorbarFont'], labelpad=10)
 cbar.ax.tick_params(labelsize=plt_settings['AxesFont'])
 
-plt.savefig(f'{plot_dir}/phase_portrait.pdf', dpi=300, bbox_inches='tight')
+plt.savefig(f'{plot_dir}/{output_name}', dpi=300, bbox_inches='tight')
 plt.close()
 
 # Plot 6: Contact line / bridge position over time (for spreading)
@@ -297,13 +296,9 @@ if is_spreading:
             sort_idx = np.argsort(x)
             x = x[sort_idx]
             h = h[sort_idx]
-            # Find where height drops below threshold (contact line)
-            threshold = 0.01  # slightly above precursor
-            contact_idx = np.where(h > threshold)[0]
-            if len(contact_idx) > 0:
-                contact_positions.append(x[contact_idx[-1]])
-            else:
-                contact_positions.append(x[-1])
+            # Find contact line using shared function
+            hp_default = 1e-4  # default precursor film thickness
+            contact_positions.append(find_drop_edge(x, h, hp_default, side='right'))
 
     fig6, ax = plt.subplots(figsize=(12, 8))
     ax.plot(time_data, contact_positions, 'b-', linewidth=3)
@@ -318,4 +313,5 @@ print(f"Time range: {time_data[0]:.2f} to {time_data[-1]:.2f}")
 if is_spreading:
     print(f"Maximum height: {max(h_max_data):.6f}")
 else:
-    print(f"Minimum bridge height reached: {min(h_min_data):.6f}")
+    print(f"Final neck height: {h0_data[-1]:.6f}")
+    print(f"Final neck position: {x0_data[-1]:.6f}")

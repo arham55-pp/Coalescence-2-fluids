@@ -1,70 +1,9 @@
-import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 import sys
 from matplotlib.gridspec import GridSpec
-from scipy.signal import find_peaks
-
-# Publication-quality matplotlib configuration
-matplotlib.rcParams['font.family'] = 'serif'
-matplotlib.rcParams['font.serif'] = ['Computer Modern Roman']
-matplotlib.rcParams['text.usetex'] = True
-matplotlib.rcParams['text.latex.preamble'] = r'\usepackage{amsmath}'
-matplotlib.rcParams['figure.dpi'] = 150
-matplotlib.rcParams['lines.linewidth'] = 2.5
-
-# Publication-quality settings (scaled for 10-12 inch figures)
-plt_settings = {
-    'LabelFont': 28,      # Axis labels
-    'AxesFont': 22,       # Tick labels
-    'TitleFont': 28,      # Plot titles
-    'LegendFont': 18,     # Legend entries
-    'ColorbarFont': 22,   # Colorbar labels
-}
-
-
-def style_axis(ax, xlabel=None, ylabel=None, title=None):
-    """Apply publication-quality styling to an axis."""
-    ax.tick_params(axis='both', which='major', labelsize=plt_settings['AxesFont'],
-                   width=2, length=8, direction='out', pad=8)
-    ax.tick_params(which='minor', width=1.5, length=4, direction='out')
-    for spine in ax.spines.values():
-        spine.set_linewidth(2)
-    ax.minorticks_on()
-    ax.grid(True, alpha=0.3, linewidth=1)
-    if xlabel:
-        ax.set_xlabel(xlabel, fontsize=plt_settings['LabelFont'], labelpad=10)
-    if ylabel:
-        ax.set_ylabel(ylabel, fontsize=plt_settings['LabelFont'], labelpad=10)
-    if title:
-        ax.set_title(title, fontsize=plt_settings['TitleFont'], pad=15)
-
-
-def find_neck(x, h):
-    """Find coalescence neck (local minimum closest to x=0).
-
-    Returns:
-        x0: neck position
-        h0: neck height
-    """
-    sort_idx = np.argsort(x)
-    x_sorted, h_sorted = x[sort_idx], h[sort_idx]
-
-    # Find local minima (peaks in -h) with prominence filtering
-    prominence = 0.01 * (h_sorted.max() - h_sorted.min())
-    min_indices, _ = find_peaks(-h_sorted, prominence=prominence)
-
-    if len(min_indices) == 0:
-        # Fallback: interpolate at x=0
-        return 0.0, np.interp(0.0, x_sorted, h_sorted)
-
-    # Select minimum closest to x=0
-    min_positions = x_sorted[min_indices]
-    closest_idx = min_indices[np.argmin(np.abs(min_positions))]
-
-    return x_sorted[closest_idx], h_sorted[closest_idx]
-
+from postprocess_functions import plt_settings, style_axis, find_neck
 
 # Get base folder from command line, default to "coalescence"
 base_folder = sys.argv[1] if len(sys.argv) > 1 else "coalescence"
