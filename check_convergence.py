@@ -13,13 +13,9 @@ import argparse
 import glob
 import re
 import numpy as np
-from scipy.optimize import curve_fit
 import sys
 
-
-def linear_model(t, v, t0):
-    """h0(t) = v * (t - t0)"""
-    return v * (t - t0)
+from postprocess_functions import find_neck, find_drop_edge
 
 
 def load_simulation_data(outdir, hp=1e-4):
@@ -27,9 +23,9 @@ def load_simulation_data(outdir, hp=1e-4):
     Load h0(t), x0(t), xe(t) from simulation output directory.
 
     Variables:
-        h0: Neck height — minimum film thickness in bridge region (|x| < 1.5)
-        x0: Neck position — x-coordinate where h = h0
-        xe: Drop edge — rightmost x where h > threshold (drop footprint)
+        h0: Neck height — local minimum closest to x=0 (using find_neck)
+        x0: Neck position — x-coordinate of neck minimum
+        xe: Drop edge — rightmost x where h > threshold (using find_drop_edge)
 
     Args:
         outdir: Path to simulation output directory
@@ -56,27 +52,9 @@ def load_simulation_data(outdir, hp=1e-4):
         x = data[:, 0]
         h = data[:, 1]
 
-        # Restrict to bridge region (|x| < 1.5) to exclude precursor film
-        bridge_mask = np.abs(x) < 1.5
-        x_bridge = x[bridge_mask]
-        h_bridge = h[bridge_mask]
-
-        # h0: neck height (minimum in bridge region)
-        h0 = np.min(h_bridge)
-
-        # x0: position of neck minimum
-        x0 = x_bridge[np.argmin(h_bridge)]
-
-        # xe: drop edge (where h drops below threshold on right side)
-        threshold = max(2 * hp, 0.01)
-        right_mask = x > 0
-        h_right = h[right_mask]
-        x_right = x[right_mask]
-        below = h_right < threshold
-        if np.any(below):
-            xe = x_right[np.argmax(below)]
-        else:
-            xe = x_right[-1]
+        # Use shared functions for robust detection
+        x0, h0 = find_neck(x, h)
+        xe = find_drop_edge(x, h, hp, side='right')
 
         time_data.append(time)
         h0_data.append(h0)
@@ -91,69 +69,57 @@ def load_simulation_data(outdir, hp=1e-4):
     }
 
 
-def fit_coalescence_velocity(time, h0, t_min=1.0, t_max=50.0):
+def compute_signal_difference(t1, s1, t2, s2, n_points=200):
     """
-    Fit h0(t) = v * (t - t0) to extract coalescence velocity v.
+    Compare two time signals with different time grids.
 
-    Returns: (v, t0, r_squared)
+    Interpolates both signals to a common time grid and computes
+    relative RMS and max differences.
+
+    Args:
+        t1, s1: Time and signal arrays for first dataset
+        t2, s2: Time and signal arrays for second dataset (baseline)
+        n_points: Number of points for interpolation
+
+    Returns:
+        rms_pct: Relative RMS difference (%)
+        max_pct: Relative max difference (%)
     """
-    # Select fitting window
-    mask = (time >= t_min) & (time <= t_max) & (h0 > 0.01)
-    t_fit = time[mask]
-    h_fit = h0[mask]
+    # Interpolate to common time range
+    t_max = min(t1[-1], t2[-1])
+    t_common = np.linspace(0, t_max, n_points)
 
-    if len(t_fit) < 5:
-        return None, None, None
+    s1_interp = np.interp(t_common, t1, s1)
+    s2_interp = np.interp(t_common, t2, s2)
 
-    try:
-        # Initial guess: slope from endpoints, intercept
-        v_guess = (h_fit[-1] - h_fit[0]) / (t_fit[-1] - t_fit[0])
-        t0_guess = t_fit[0] - h_fit[0] / v_guess if v_guess != 0 else 0
+    diff = s1_interp - s2_interp
+    scale = np.sqrt(np.mean(s2_interp**2)) + 1e-10  # RMS of baseline
 
-        popt, pcov = curve_fit(linear_model, t_fit, h_fit, p0=[v_guess, t0_guess])
-        v, t0 = popt
+    rms_pct = np.sqrt(np.mean(diff**2)) / scale * 100
+    max_pct = np.max(np.abs(diff)) / scale * 100
 
-        # Compute R-squared
-        h_pred = linear_model(t_fit, v, t0)
-        ss_res = np.sum((h_fit - h_pred) ** 2)
-        ss_tot = np.sum((h_fit - np.mean(h_fit)) ** 2)
-        r_squared = 1 - ss_res / ss_tot if ss_tot > 0 else 0
-
-        return v, t0, r_squared
-    except Exception as e:
-        print(f"    Warning: fitting failed: {e}")
-        return None, None, None
+    return rms_pct, max_pct
 
 
-def compute_metrics(data):
-    """Compute convergence metrics from simulation data."""
-    if data is None:
+def compare_datasets(data_test, data_baseline):
+    """
+    Compare test dataset to baseline, computing signal differences.
+
+    Returns dict with RMS and Max differences for h0, x0, xe (all in %).
+    """
+    if data_test is None or data_baseline is None:
         return None
 
-    # Fit for coalescence velocity
-    v, t0, r2 = fit_coalescence_velocity(data['time'], data['h0'])
+    results = {}
+    for key in ['h0', 'x0', 'xe']:
+        rms, maxd = compute_signal_difference(
+            data_test['time'], data_test[key],
+            data_baseline['time'], data_baseline[key]
+        )
+        results[f'{key}_rms'] = rms
+        results[f'{key}_max'] = maxd
 
-    # Max x0 (maximum neck displacement)
-    x0_max = np.max(np.abs(data['x0']))
-
-    # Final xe (drop edge)
-    xe_final = data['xe'][-1]
-
-    return {
-        'v': v,
-        't0': t0,
-        'r2': r2,
-        'x0_max': x0_max,
-        'xe': xe_final,
-        't_max': data['time'][-1]
-    }
-
-
-def relative_diff(val, baseline):
-    """Compute relative difference in percent."""
-    if baseline is None or val is None or baseline == 0:
-        return None
-    return abs(val - baseline) / abs(baseline) * 100
+    return results
 
 
 def check_hp_sensitivity(beta=0.1, Pe=1.0, hp_default=1e-4):
@@ -163,76 +129,66 @@ def check_hp_sensitivity(beta=0.1, Pe=1.0, hp_default=1e-4):
         print(msg)
         lines.append(msg)
 
-    log("=" * 70)
+    log("=" * 90)
     log("SENSITIVITY ANALYSIS: PRECURSOR FILM THICKNESS (hp)")
     log(f"Parameters: beta = {beta}, Pe = {Pe}")
-    log("=" * 70)
+    log("=" * 90)
 
     hp_values = ['1e-5', '1e-4', '1e-3', '1e-2']
     baseline_hp = '1e-4'
 
-    all_metrics = {}
+    all_data = {}
 
     for hp_str in hp_values:
         outdir = f'sensitivity_hp_{hp_str}'
-        hp_val = float(hp_str)  # Use actual hp for this directory
+        hp_val = float(hp_str)
         log(f"\nLoading {outdir}...")
         data = load_simulation_data(outdir, hp=hp_val)
         if data is None:
             log(f"  No data found")
             continue
 
-        metrics = compute_metrics(data)
-        if metrics is None:
-            continue
+        all_data[hp_str] = data
+        log(f"  t_max = {data['time'][-1]:.1f}, {len(data['time'])} timesteps")
 
-        all_metrics[hp_str] = metrics
-        log(f"  t_max = {metrics['t_max']:.1f}")
-        log(f"  v = {metrics['v']:.6f} (R² = {metrics['r2']:.4f})")
-        log(f"  max(|x0|) = {metrics['x0_max']:.6f}")
-        log(f"  xe = {metrics['xe']:.6f}")
+    # Compute signal differences
+    if baseline_hp in all_data:
+        baseline = all_data[baseline_hp]
+        log(f"\n{'-' * 90}")
+        log(f"Signal differences (baseline: hp = {baseline_hp})")
+        log(f"{'-' * 90}")
+        log(f"{'hp':<10} {'h0 RMS%':<10} {'h0 Max%':<10} {'x0 RMS%':<10} {'x0 Max%':<10} {'xe RMS%':<10} {'xe Max%':<10}")
+        log(f"{'-' * 90}")
 
-    # Compute relative differences
-    if baseline_hp in all_metrics:
-        baseline = all_metrics[baseline_hp]
-        log(f"\n{'-' * 70}")
-        log(f"Relative differences (baseline: hp = {baseline_hp})")
-        log(f"{'-' * 70}")
-        log(f"{'hp':<10} {'v diff (%)':<15} {'max(|x0|) diff (%)':<20} {'xe diff (%)':<15}")
-        log(f"{'-' * 70}")
-
-        max_v_diff = 0
-        max_x0_diff = 0
-        max_xe_diff = 0
+        max_h0_rms, max_h0_max = 0, 0
+        max_x0_rms, max_x0_max = 0, 0
+        max_xe_rms, max_xe_max = 0, 0
 
         for hp_str in hp_values:
-            if hp_str not in all_metrics or hp_str == baseline_hp:
+            if hp_str not in all_data or hp_str == baseline_hp:
                 continue
 
-            m = all_metrics[hp_str]
-            v_diff = relative_diff(m['v'], baseline['v'])
-            x0_diff = relative_diff(m['x0_max'], baseline['x0_max'])
-            xe_diff = relative_diff(m['xe'], baseline['xe'])
+            diff = compare_datasets(all_data[hp_str], baseline)
+            if diff is None:
+                continue
 
-            if v_diff is not None:
-                max_v_diff = max(max_v_diff, v_diff)
-            if x0_diff is not None:
-                max_x0_diff = max(max_x0_diff, x0_diff)
-            if xe_diff is not None:
-                max_xe_diff = max(max_xe_diff, xe_diff)
+            max_h0_rms = max(max_h0_rms, diff['h0_rms'])
+            max_h0_max = max(max_h0_max, diff['h0_max'])
+            max_x0_rms = max(max_x0_rms, diff['x0_rms'])
+            max_x0_max = max(max_x0_max, diff['x0_max'])
+            max_xe_rms = max(max_xe_rms, diff['xe_rms'])
+            max_xe_max = max(max_xe_max, diff['xe_max'])
 
-            v_str = f"{v_diff:.2f}" if v_diff is not None else "N/A"
-            x0_str = f"{x0_diff:.2f}" if x0_diff is not None else "N/A"
-            xe_str = f"{xe_diff:.2f}" if xe_diff is not None else "N/A"
+            log(f"{hp_str:<10} {diff['h0_rms']:<10.2f} {diff['h0_max']:<10.2f} "
+                f"{diff['x0_rms']:<10.2f} {diff['x0_max']:<10.2f} "
+                f"{diff['xe_rms']:<10.2f} {diff['xe_max']:<10.2f}")
 
-            log(f"{hp_str:<10} {v_str:<15} {x0_str:<20} {xe_str:<15}")
-
-        log(f"\n{'=' * 70}")
-        log(f"SUMMARY (hp: {baseline_hp} to 1e-2):")
-        log(f"  Max difference in v:         {max_v_diff:.1f}%")
-        log(f"  Max difference in max(|x0|): {max_x0_diff:.1f}%")
-        log(f"  Max difference in xe:        {max_xe_diff:.1f}%")
-        log(f"{'=' * 70}")
+        log(f"\n{'=' * 90}")
+        log(f"SUMMARY (hp: {baseline_hp} baseline):")
+        log(f"  h0(t): max RMS = {max_h0_rms:.2f}%, max peak = {max_h0_max:.2f}%")
+        log(f"  x0(t): max RMS = {max_x0_rms:.2f}%, max peak = {max_x0_max:.2f}%")
+        log(f"  xe(t): max RMS = {max_xe_rms:.2f}%, max peak = {max_xe_max:.2f}%")
+        log(f"{'=' * 90}")
 
     # Save to file
     filename = f'check-convergence-Pe{Pe}_beta{beta}-hp.txt'
@@ -240,7 +196,7 @@ def check_hp_sensitivity(beta=0.1, Pe=1.0, hp_default=1e-4):
         f.write('\n'.join(lines) + '\n')
     print(f"\nResults saved to {filename}")
 
-    return all_metrics
+    return all_data
 
 
 def check_Lx_sensitivity(beta=0.1, Pe=1.0, hp=1e-4):
@@ -250,15 +206,15 @@ def check_Lx_sensitivity(beta=0.1, Pe=1.0, hp=1e-4):
         print(msg)
         lines.append(msg)
 
-    log("=" * 70)
+    log("=" * 90)
     log("SENSITIVITY ANALYSIS: DOMAIN SIZE (Lx)")
     log(f"Parameters: beta = {beta}, Pe = {Pe}, hp = {hp}")
-    log("=" * 70)
+    log("=" * 90)
 
     Lx_values = ['6', '8', '10', '12']
     baseline_Lx = '6'
 
-    all_metrics = {}
+    all_data = {}
 
     for Lx in Lx_values:
         outdir = f'sensitivity_Lx_{Lx}'
@@ -268,60 +224,47 @@ def check_Lx_sensitivity(beta=0.1, Pe=1.0, hp=1e-4):
             log(f"  No data found")
             continue
 
-        metrics = compute_metrics(data)
-        if metrics is None:
-            continue
+        all_data[Lx] = data
+        log(f"  t_max = {data['time'][-1]:.1f}, {len(data['time'])} timesteps")
 
-        all_metrics[Lx] = metrics
-        log(f"  t_max = {metrics['t_max']:.1f}")
-        log(f"  v = {metrics['v']:.6f} (R² = {metrics['r2']:.4f})")
-        log(f"  max(|x0|) = {metrics['x0_max']:.6f}")
-        log(f"  xe = {metrics['xe']:.6f}")
+    # Compute signal differences
+    if baseline_Lx in all_data:
+        baseline = all_data[baseline_Lx]
+        log(f"\n{'-' * 90}")
+        log(f"Signal differences (baseline: Lx = {baseline_Lx})")
+        log(f"{'-' * 90}")
+        log(f"{'Lx':<10} {'h0 RMS%':<10} {'h0 Max%':<10} {'x0 RMS%':<10} {'x0 Max%':<10} {'xe RMS%':<10} {'xe Max%':<10}")
+        log(f"{'-' * 90}")
 
-    # Compute relative differences
-    if baseline_Lx in all_metrics:
-        baseline = all_metrics[baseline_Lx]
-        log(f"\n{'-' * 70}")
-        log(f"Relative differences (baseline: Lx = {baseline_Lx})")
-        log(f"{'-' * 70}")
-        log(f"{'Lx':<10} {'v diff (%)':<15} {'max(|x0|) diff (%)':<20} {'xe diff (%)':<15}")
-        log(f"{'-' * 70}")
-
-        max_v_diff = 0
-        max_x0_diff = 0
-        max_xe_diff = 0
-        largest_Lx = baseline_Lx
+        max_h0_rms, max_h0_max = 0, 0
+        max_x0_rms, max_x0_max = 0, 0
+        max_xe_rms, max_xe_max = 0, 0
 
         for Lx in Lx_values:
-            if Lx not in all_metrics or Lx == baseline_Lx:
+            if Lx not in all_data or Lx == baseline_Lx:
                 continue
 
-            m = all_metrics[Lx]
-            v_diff = relative_diff(m['v'], baseline['v'])
-            x0_diff = relative_diff(m['x0_max'], baseline['x0_max'])
-            xe_diff = relative_diff(m['xe'], baseline['xe'])
+            diff = compare_datasets(all_data[Lx], baseline)
+            if diff is None:
+                continue
 
-            if v_diff is not None:
-                max_v_diff = max(max_v_diff, v_diff)
-            if x0_diff is not None:
-                max_x0_diff = max(max_x0_diff, x0_diff)
-            if xe_diff is not None:
-                max_xe_diff = max(max_xe_diff, xe_diff)
+            max_h0_rms = max(max_h0_rms, diff['h0_rms'])
+            max_h0_max = max(max_h0_max, diff['h0_max'])
+            max_x0_rms = max(max_x0_rms, diff['x0_rms'])
+            max_x0_max = max(max_x0_max, diff['x0_max'])
+            max_xe_rms = max(max_xe_rms, diff['xe_rms'])
+            max_xe_max = max(max_xe_max, diff['xe_max'])
 
-            largest_Lx = Lx
+            log(f"{Lx:<10} {diff['h0_rms']:<10.2f} {diff['h0_max']:<10.2f} "
+                f"{diff['x0_rms']:<10.2f} {diff['x0_max']:<10.2f} "
+                f"{diff['xe_rms']:<10.2f} {diff['xe_max']:<10.2f}")
 
-            v_str = f"{v_diff:.2f}" if v_diff is not None else "N/A"
-            x0_str = f"{x0_diff:.2f}" if x0_diff is not None else "N/A"
-            xe_str = f"{xe_diff:.2f}" if xe_diff is not None else "N/A"
-
-            log(f"{Lx:<10} {v_str:<15} {x0_str:<20} {xe_str:<15}")
-
-        log(f"\n{'=' * 70}")
-        log(f"SUMMARY (Lx: {baseline_Lx} to {largest_Lx}):")
-        log(f"  Max difference in v:         {max_v_diff:.1f}%")
-        log(f"  Max difference in max(|x0|): {max_x0_diff:.1f}%")
-        log(f"  Max difference in xe:        {max_xe_diff:.1f}%")
-        log(f"{'=' * 70}")
+        log(f"\n{'=' * 90}")
+        log(f"SUMMARY (Lx: {baseline_Lx} baseline):")
+        log(f"  h0(t): max RMS = {max_h0_rms:.2f}%, max peak = {max_h0_max:.2f}%")
+        log(f"  x0(t): max RMS = {max_x0_rms:.2f}%, max peak = {max_x0_max:.2f}%")
+        log(f"  xe(t): max RMS = {max_xe_rms:.2f}%, max peak = {max_xe_max:.2f}%")
+        log(f"{'=' * 90}")
 
     # Save to file
     filename = f'check-convergence-Pe{Pe}_beta{beta}-Lx.txt'
@@ -329,7 +272,7 @@ def check_Lx_sensitivity(beta=0.1, Pe=1.0, hp=1e-4):
         f.write('\n'.join(lines) + '\n')
     print(f"\nResults saved to {filename}")
 
-    return all_metrics
+    return all_data
 
 
 def check_N_sensitivity(beta=0.1, Pe=1.0, hp=1e-4):
@@ -339,15 +282,15 @@ def check_N_sensitivity(beta=0.1, Pe=1.0, hp=1e-4):
         print(msg)
         lines.append(msg)
 
-    log("=" * 70)
+    log("=" * 90)
     log("SENSITIVITY ANALYSIS: MESH RESOLUTION (N)")
     log(f"Parameters: beta = {beta}, Pe = {Pe}, hp = {hp}")
-    log("=" * 70)
+    log("=" * 90)
 
     N_values = ['500', '1000', '2000', '4000']
     baseline_N = '1000'
 
-    all_metrics = {}
+    all_data = {}
 
     for N in N_values:
         outdir = f'sensitivity_N_{N}'
@@ -357,57 +300,47 @@ def check_N_sensitivity(beta=0.1, Pe=1.0, hp=1e-4):
             log(f"  No data found")
             continue
 
-        metrics = compute_metrics(data)
-        if metrics is None:
-            continue
+        all_data[N] = data
+        log(f"  t_max = {data['time'][-1]:.1f}, {len(data['time'])} timesteps")
 
-        all_metrics[N] = metrics
-        log(f"  t_max = {metrics['t_max']:.1f}")
-        log(f"  v = {metrics['v']:.6f} (R² = {metrics['r2']:.4f})")
-        log(f"  max(|x0|) = {metrics['x0_max']:.6f}")
-        log(f"  xe = {metrics['xe']:.6f}")
+    # Compute signal differences
+    if baseline_N in all_data:
+        baseline = all_data[baseline_N]
+        log(f"\n{'-' * 90}")
+        log(f"Signal differences (baseline: N = {baseline_N})")
+        log(f"{'-' * 90}")
+        log(f"{'N':<10} {'h0 RMS%':<10} {'h0 Max%':<10} {'x0 RMS%':<10} {'x0 Max%':<10} {'xe RMS%':<10} {'xe Max%':<10}")
+        log(f"{'-' * 90}")
 
-    # Compute relative differences
-    if baseline_N in all_metrics:
-        baseline = all_metrics[baseline_N]
-        log(f"\n{'-' * 70}")
-        log(f"Relative differences (baseline: N = {baseline_N})")
-        log(f"{'-' * 70}")
-        log(f"{'N':<10} {'v diff (%)':<15} {'max(|x0|) diff (%)':<20} {'xe diff (%)':<15}")
-        log(f"{'-' * 70}")
-
-        max_v_diff = 0
-        max_x0_diff = 0
-        max_xe_diff = 0
+        max_h0_rms, max_h0_max = 0, 0
+        max_x0_rms, max_x0_max = 0, 0
+        max_xe_rms, max_xe_max = 0, 0
 
         for N in N_values:
-            if N not in all_metrics or N == baseline_N:
+            if N not in all_data or N == baseline_N:
                 continue
 
-            m = all_metrics[N]
-            v_diff = relative_diff(m['v'], baseline['v'])
-            x0_diff = relative_diff(m['x0_max'], baseline['x0_max'])
-            xe_diff = relative_diff(m['xe'], baseline['xe'])
+            diff = compare_datasets(all_data[N], baseline)
+            if diff is None:
+                continue
 
-            if v_diff is not None:
-                max_v_diff = max(max_v_diff, v_diff)
-            if x0_diff is not None:
-                max_x0_diff = max(max_x0_diff, x0_diff)
-            if xe_diff is not None:
-                max_xe_diff = max(max_xe_diff, xe_diff)
+            max_h0_rms = max(max_h0_rms, diff['h0_rms'])
+            max_h0_max = max(max_h0_max, diff['h0_max'])
+            max_x0_rms = max(max_x0_rms, diff['x0_rms'])
+            max_x0_max = max(max_x0_max, diff['x0_max'])
+            max_xe_rms = max(max_xe_rms, diff['xe_rms'])
+            max_xe_max = max(max_xe_max, diff['xe_max'])
 
-            v_str = f"{v_diff:.2f}" if v_diff is not None else "N/A"
-            x0_str = f"{x0_diff:.2f}" if x0_diff is not None else "N/A"
-            xe_str = f"{xe_diff:.2f}" if xe_diff is not None else "N/A"
+            log(f"{N:<10} {diff['h0_rms']:<10.2f} {diff['h0_max']:<10.2f} "
+                f"{diff['x0_rms']:<10.2f} {diff['x0_max']:<10.2f} "
+                f"{diff['xe_rms']:<10.2f} {diff['xe_max']:<10.2f}")
 
-            log(f"{N:<10} {v_str:<15} {x0_str:<20} {xe_str:<15}")
-
-        log(f"\n{'=' * 70}")
-        log(f"SUMMARY (N: 500 to 4000, baseline = {baseline_N}):")
-        log(f"  Max difference in v:         {max_v_diff:.1f}%")
-        log(f"  Max difference in max(|x0|): {max_x0_diff:.1f}%")
-        log(f"  Max difference in xe:        {max_xe_diff:.1f}%")
-        log(f"{'=' * 70}")
+        log(f"\n{'=' * 90}")
+        log(f"SUMMARY (N: {baseline_N} baseline):")
+        log(f"  h0(t): max RMS = {max_h0_rms:.2f}%, max peak = {max_h0_max:.2f}%")
+        log(f"  x0(t): max RMS = {max_x0_rms:.2f}%, max peak = {max_x0_max:.2f}%")
+        log(f"  xe(t): max RMS = {max_xe_rms:.2f}%, max peak = {max_xe_max:.2f}%")
+        log(f"{'=' * 90}")
 
     # Save to file
     filename = f'check-convergence-Pe{Pe}_beta{beta}-N.txt'
@@ -415,7 +348,7 @@ def check_N_sensitivity(beta=0.1, Pe=1.0, hp=1e-4):
         f.write('\n'.join(lines) + '\n')
     print(f"\nResults saved to {filename}")
 
-    return all_metrics
+    return all_data
 
 
 def main():
