@@ -41,7 +41,7 @@ GAMMA0=0.8
 THETA=20
 
 # Precursor film values to test (4 values, spanning 4 orders of magnitude)
-HP_VALUES=("1e-5" "1e-4" "1e-3" "1e-2")
+HP_VALUES=("9e-5" "1e-4" "1e-3" "1e-2")
 
 # Clean up old output directories
 for HP in "${HP_VALUES[@]}"; do
@@ -56,24 +56,15 @@ echo "----------------------------------------------"
 PIDS=()
 for HP in "${HP_VALUES[@]}"; do
     OUTDIR="sensitivity_hp_${HP}"
-
-    # Use finer mesh for thinner precursor film
-    if [ "$HP" = "1e-5" ]; then
-        N_CASE=2000
-    else
-        N_CASE=1000
-    fi
-
     python coalescence.py \
         --beta $BETA \
         --Pe $PE \
         --Gamma0 $GAMMA0 \
         --theta $THETA \
         --hp $HP \
-        --N $N_CASE \
         --output-dir "$OUTDIR" > "${OUTDIR}_log.txt" 2>&1 &
     PIDS+=($!)
-    echo "Started hp = $HP with N = $N_CASE (PID: $!)"
+    echo "Started hp = $HP (PID: $!)"
 done
 
 # Wait for all simulations to complete
