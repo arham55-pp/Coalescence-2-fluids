@@ -1,3 +1,43 @@
+"""
+Postprocessing for clean coalescence and spreading simulations.
+
+Handles both clean drop coalescence (no surfactant) and axisymmetric
+droplet spreading cases. Auto-detects mode based on directory name.
+
+Usage:
+    python postprocess_clean.py <output_directory>
+    python postprocess_clean.py coalescence_clean  # clean coalescence
+    python postprocess_clean.py spreading_clean    # axisymmetric spreading
+
+Output Files (saved to <directory>_plots/):
+
+    For both modes:
+        1. height_pressure_evolution.pdf
+           - Top: height profiles h(x) at selected times
+           - Bottom: pressure profiles p(x) at same times
+
+        2. spacetime_height.pdf
+           - Contour plot of h(x,t) or h(r,t)
+
+        3. time_series_analysis.pdf
+           - Coalescence: h_0(t), x_0(t), h_max(t), p_max(t)
+           - Spreading: h_max(t), h_center(t), p_max(t)
+
+        4. zoom_region.pdf
+           - Coalescence: bridge region |x| < 0.5
+           - Spreading: contact line region r < 2
+
+    Coalescence only:
+        5. neck_trajectory.pdf - phase portrait (x_0, h_0)
+
+    Spreading only:
+        5. phase_portrait.pdf - (h_max, p_max) trajectory
+        6. contact_line_position.pdf - contact radius r_c(t)
+
+Mode Detection:
+    - If "spreading" appears in directory name: axisymmetric mode
+    - Otherwise: Cartesian coalescence mode
+"""
 import matplotlib.pyplot as plt
 import numpy as np
 import os

@@ -1,3 +1,47 @@
+"""
+Postprocessing for surfactant coalescence simulations.
+
+Generates 5 publication-quality PDF figures from simulation output,
+analyzing the evolution of film height, surfactant concentration,
+and coalescence dynamics.
+
+Usage:
+    python postprocess.py <output_directory>
+    python postprocess.py coalescence  # default
+
+Output Files (saved to <directory>_plots/):
+    1. height_surfactant_evolution.pdf
+       - Top panel: height profiles h(x) at selected times
+       - Bottom panel: surfactant profiles Gamma(x) at same times
+       - Time indicated by colorbar (viridis colormap)
+
+    2. spacetime_height.pdf
+       - Contour plot of h(x,t) showing coalescence progression
+       - x-axis: spatial position, y-axis: time
+       - Useful for visualizing bridge growth and neck motion
+
+    3. time_series_analysis.pdf
+       - 2x2 grid of key quantities vs time:
+         * Neck height h_0(t): minimum film thickness
+         * Neck position x_0(t): location of minimum
+         * Maximum height h_max(t)
+         * Maximum surfactant |Gamma|_max(t)
+
+    4. bridge_region_zoom.pdf
+       - Detailed view of bridge region (|x| < 0.5) at 5 stages
+       - Shows h, p, Gamma profiles to analyze Marangoni effects
+       - Stages: Initial, Early, Middle, Late, Final
+
+    5. neck_trajectory.pdf
+       - Phase portrait: x_0 vs h_0 parametrized by time
+       - Arrows indicate direction of evolution
+       - Colorbar shows time progression
+
+Key Metrics Extracted:
+    - h_0(t): Neck height (from find_neck using peak detection)
+    - x_0(t): Horizontal position of neck minimum
+    - Gamma_max(t): Maximum surfactant concentration
+"""
 import matplotlib.pyplot as plt
 import numpy as np
 import os

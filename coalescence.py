@@ -1,3 +1,39 @@
+"""
+Droplet coalescence simulation with insoluble surfactants.
+
+This script simulates the early-time coalescence of two viscous sessile drops
+on a substrate, where the left drop is coated with an insoluble surfactant
+monolayer and the right drop is initially clean. The resulting surfactant
+gradient drives Marangoni stresses that modify the coalescence dynamics.
+
+Physical Setup (see paper Section 2.1):
+    Two spherical-cap drops with contact angle theta touch at x=0.
+    Initial geometry:
+        - Drop centers at x = ±sqrt(2RH - H^2)
+        - Sphere radius: R = L/sin(theta)
+        - Apex height: H = L(1-cos(theta))/sin(theta)
+
+    A precursor film of thickness h_p covers the substrate, regularizing
+    the contact line and enabling the lubrication formulation.
+
+Surfactant Configuration:
+    - Left drop (x < 0): uniform surfactant concentration Gamma_0
+    - Right drop (x > 0): clean interface (Gamma = 0)
+    - The step is smoothed using tanh(x/h_p) for numerical stability
+
+Key Results:
+    - Low Pe: Bridge height grows as h_0 = 0.272(1 - beta*Gamma_0/2)*theta^4*t
+    - Low Pe: Marangoni-driven drift x_0 ~ t^(3/2)
+    - Maximum lateral excursion scales as x_f ~ beta*Pe
+    - Critical strength beta_c ~ 0.15 separates coalescence from non-coalescence
+
+Usage:
+    python coalescence.py --beta 0.1 --Pe 1.0 --Gamma0 0.8 --theta 20
+
+Output:
+    Creates directory with domain/domain_XXXXXX.txt files containing
+    (x, h, p, Gamma) at each output time.
+"""
 import argparse
 import os
 import sys
