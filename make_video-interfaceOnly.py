@@ -57,4 +57,5 @@ for i, file in enumerate(files):
         print(f"  Processed {i + 1}/{len(files)} frames...")
 
 print(f"All {len(files)} frames saved to '{frame_dir}/'")
-print(f"To make a video: ffmpeg -framerate 30 -i {frame_dir}/frame_%05d.png -c:v libx264 -pix_fmt yuv420p {base_folder}_video.mp4")
+print(f"To make a video, use:")
+print(f"  ffmpeg -framerate 30 -pattern_type glob -i '{frame_dir}/*.png' -vf \"pad=ceil(iw/2)*2:ceil(ih/2)*2\" -c:v libx264 -r 30 -pix_fmt yuv420p {base_folder}_video.mp4")

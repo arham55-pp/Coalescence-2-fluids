@@ -4,6 +4,7 @@ import numpy as np
 import os
 import sys
 from matplotlib.gridspec import GridSpec
+from scipy.signal import find_peaks
 
 # Publication-quality matplotlib configuration
 matplotlib.rcParams['font.family'] = 'serif'
@@ -39,6 +40,32 @@ def style_axis(ax, xlabel=None, ylabel=None, title=None):
     if title:
         ax.set_title(title, fontsize=plt_settings['TitleFont'], pad=15)
 
+
+def find_neck(x, h):
+    """Find coalescence neck (local minimum closest to x=0).
+
+    Returns:
+        x0: neck position
+        h0: neck height
+    """
+    sort_idx = np.argsort(x)
+    x_sorted, h_sorted = x[sort_idx], h[sort_idx]
+
+    # Find local minima (peaks in -h) with prominence filtering
+    prominence = 0.01 * (h_sorted.max() - h_sorted.min())
+    min_indices, _ = find_peaks(-h_sorted, prominence=prominence)
+
+    if len(min_indices) == 0:
+        # Fallback: interpolate at x=0
+        return 0.0, np.interp(0.0, x_sorted, h_sorted)
+
+    # Select minimum closest to x=0
+    min_positions = x_sorted[min_indices]
+    closest_idx = min_indices[np.argmin(np.abs(min_positions))]
+
+    return x_sorted[closest_idx], h_sorted[closest_idx]
+
+
 # Get base folder from command line, default to "coalescence"
 base_folder = sys.argv[1] if len(sys.argv) > 1 else "coalescence"
 output_dir = f"{base_folder}/domain"
@@ -52,9 +79,9 @@ if not os.path.exists(plot_dir):
 
 # Initialize lists for time series data
 time_data = []
-h_min_data = []
+h0_data = []       # neck height
+x0_data = []       # neck position
 h_max_data = []
-h_center_data = []
 gamma_max_data = []
 
 # Read first and last files to understand the evolution
@@ -147,30 +174,33 @@ for f in files:
         gamma = data[:, 3]
         
         time_data.append(time)
-        h_min_data.append(np.min(h))
+        x0, h0 = find_neck(x, h)
+        x0_data.append(x0)
+        h0_data.append(h0)
         h_max_data.append(np.max(h))
-        h_center_data.append(h[len(h)//2])
         gamma_max_data.append(np.max(np.abs(gamma)))
 
 fig3 = plt.figure(figsize=(14, 10))
 gs = GridSpec(2, 2, figure=fig3)
 
-ax1 = fig3.add_subplot(gs[0, :])
-ax1.plot(time_data, h_min_data, 'b-', linewidth=3, label='Minimum height')
-style_axis(ax1, xlabel=r'Time $t$', ylabel=r'Minimum height',
-           title=r'Evolution of Bridge Height During Coalescence')
-ax1.legend(fontsize=plt_settings['LegendFont'], frameon=False)
+ax1 = fig3.add_subplot(gs[0, 0])
+ax1.plot(time_data, h0_data, 'b-', linewidth=3)
+style_axis(ax1, xlabel=r'Time $t$', ylabel=r'Neck height $h_0$',
+           title=r'Neck Height Evolution')
 
-ax2 = fig3.add_subplot(gs[1, 0])
-ax2.plot(time_data, h_max_data, 'r-', linewidth=3, label='Maximum height')
-ax2.plot(time_data, h_center_data, 'g--', linewidth=3, label='Center height')
-style_axis(ax2, xlabel=r'Time $t$', ylabel=r'Height',
-           title=r'Height Evolution at Different Positions')
-ax2.legend(fontsize=plt_settings['LegendFont'], frameon=False)
+ax2 = fig3.add_subplot(gs[0, 1])
+ax2.plot(time_data, x0_data, 'g-', linewidth=3)
+style_axis(ax2, xlabel=r'Time $t$', ylabel=r'Neck position $x_0$',
+           title=r'Neck Position Evolution')
 
-ax3 = fig3.add_subplot(gs[1, 1])
-ax3.semilogy(time_data, gamma_max_data, 'm-', linewidth=3)
-style_axis(ax3, xlabel=r'Time $t$', ylabel=r'Max $|\Gamma|$',
+ax3 = fig3.add_subplot(gs[1, 0])
+ax3.plot(time_data, h_max_data, 'r-', linewidth=3)
+style_axis(ax3, xlabel=r'Time $t$', ylabel=r'Maximum height $h_{\max}$',
+           title=r'Maximum Height Evolution')
+
+ax4 = fig3.add_subplot(gs[1, 1])
+ax4.semilogy(time_data, gamma_max_data, 'm-', linewidth=3)
+style_axis(ax4, xlabel=r'Time $t$', ylabel=r'Max $|\Gamma|$',
            title=r'Maximum Surfactant Concentration')
 
 plt.tight_layout()
@@ -222,37 +252,38 @@ plt.tight_layout()
 plt.savefig(f'{plot_dir}/bridge_region_zoom.pdf', dpi=300, bbox_inches='tight')
 plt.close()
 
-# Plot 5: Phase portrait
-print("Creating phase portrait...")
+# Plot 5: Neck trajectory (x0 vs h0)
+print("Creating neck trajectory plot...")
 fig5, ax = plt.subplots(figsize=(10, 10))
 
 # Use color gradient for time
 colors = plt.cm.plasma(np.linspace(0, 1, len(time_data)))
 
-ax.scatter(h_min_data, gamma_max_data, c=colors, alpha=0.7, s=80, edgecolors='w', linewidth=0.5, zorder=3)
-ax.plot(h_min_data, gamma_max_data, 'k-', alpha=0.3, linewidth=1, zorder=2)
+ax.scatter(x0_data, h0_data, c=colors, alpha=0.7, s=80, edgecolors='w', linewidth=0.5, zorder=3)
+ax.plot(x0_data, h0_data, 'k-', alpha=0.3, linewidth=1, zorder=2)
 
 # Add arrows to show direction
-arrow_indices = np.linspace(0, len(h_min_data)-2, 10, dtype=int)
+arrow_indices = np.linspace(0, len(x0_data)-2, 10, dtype=int)
 for idx in arrow_indices:
-    ax.annotate('', xy=(h_min_data[idx+1], gamma_max_data[idx+1]),
-                xytext=(h_min_data[idx], gamma_max_data[idx]),
+    ax.annotate('', xy=(x0_data[idx+1], h0_data[idx+1]),
+                xytext=(x0_data[idx], h0_data[idx]),
                 arrowprops=dict(arrowstyle='->', color='black', alpha=0.5, lw=2))
 
-style_axis(ax, xlabel=r'Minimum height', ylabel=r'Maximum $|\Gamma|$',
-           title=r'Phase Portrait: Bridge Height vs Surfactant Concentration')
+style_axis(ax, xlabel=r'Neck position $x_0$', ylabel=r'Neck height $h_0$',
+           title=r'Neck Trajectory During Coalescence')
 
 # Add colorbar for time
 sm = plt.cm.ScalarMappable(cmap=plt.cm.plasma, norm=plt.Normalize(vmin=time_data[0], vmax=time_data[-1]))
 sm.set_array([])
 cbar = plt.colorbar(sm, ax=ax)
-cbar.set_label(r'Time', fontsize=plt_settings['ColorbarFont'], labelpad=10)
+cbar.set_label(r'Time $t$', fontsize=plt_settings['ColorbarFont'], labelpad=10)
 cbar.ax.tick_params(labelsize=plt_settings['AxesFont'])
 
-plt.savefig(f'{plot_dir}/phase_portrait.pdf', dpi=300, bbox_inches='tight')
+plt.savefig(f'{plot_dir}/neck_trajectory.pdf', dpi=300, bbox_inches='tight')
 plt.close()
 
 print(f"All plots have been saved to the '{plot_dir}' folder!")
 print(f"Total number of timesteps analyzed: {len(files)}")
 print(f"Time range: {time_data[0]:.2f} to {time_data[-1]:.2f}")
-print(f"Minimum bridge height reached: {min(h_min_data):.6f}")
+print(f"Final neck height: {h0_data[-1]:.6f}")
+print(f"Final neck position: {x0_data[-1]:.6f}")
