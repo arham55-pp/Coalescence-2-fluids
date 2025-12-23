@@ -64,6 +64,7 @@ for LX in "${LX_VALUES[@]}"; do
         --theta $THETA \
         --hp $HP \
         --Lx $LX \
+        --N 5000 \
         --output-dir "$OUTDIR" > "${OUTDIR}_log.txt" 2>&1 &
     PIDS+=($!)
     echo "Started Lx = $LX (PID: $!)"

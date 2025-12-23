@@ -69,7 +69,7 @@ def parse_args():
                         help="Precursor film thickness")
     parser.add_argument("--Lx", type=float, default=6.0,
                         help="Domain size")
-    parser.add_argument("--N", type=int, default=1000,
+    parser.add_argument("--N", type=int, default=5000,
                         help="Number of mesh elements")
     parser.add_argument("--max-refinement-level", type=int, default=6,
                         help="Max adaptive mesh refinement level")

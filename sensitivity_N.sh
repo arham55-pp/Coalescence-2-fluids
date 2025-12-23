@@ -41,8 +41,8 @@ GAMMA0=0.8
 THETA=20
 HP=1e-4
 
-# Mesh resolution values to test (4 values, doubling each time)
-N_VALUES=("500" "1000" "2000" "4000")
+# Mesh resolution values to test (4 values, baseline is 5000)
+N_VALUES=("1000" "2000" "5000" "10000")
 
 # Clean up old output directories
 for N in "${N_VALUES[@]}"; do
@@ -98,9 +98,9 @@ import os
 from postprocess_functions import plt_settings, style_axis, find_neck, find_drop_edge
 
 # Mesh resolution values
-N_values = ['500', '1000', '2000', '4000']
+N_values = ['1000', '2000', '5000', '10000']
 colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']
-labels = [r'$N = 500$', r'$N = 1000$', r'$N = 2000$', r'$N = 4000$']
+labels = [r'$N = 1000$', r'$N = 2000$', r'$N = 5000$', r'$N = 10000$']
 
 plot_dir = 'sensitivity_N_plots'
 os.makedirs(plot_dir, exist_ok=True)
@@ -145,14 +145,14 @@ print("\n" + "="*60)
 print("SENSITIVITY ANALYSIS: MESH RESOLUTION")
 print("="*60)
 
-if '1000' in all_data:
-    baseline = all_data['1000']
-    print(f"\nBaseline: N = 1000")
+if '5000' in all_data:
+    baseline = all_data['5000']
+    print(f"\nBaseline: N = 5000")
     print(f"  Final h0 = {baseline['h0'][-1]:.6f}")
     print(f"  Final x0 = {baseline['x0'][-1]:.6f}")
     print(f"  Final xe = {baseline['xe'][-1]:.6f}")
 
-    for N in ['500', '2000', '4000']:
+    for N in ['1000', '2000', '10000']:
         if N in all_data:
             data = all_data[N]
             t_common = np.linspace(0, min(baseline['time'][-1], data['time'][-1]), 100)

@@ -304,8 +304,8 @@ def check_N_sensitivity(beta=0.1, Pe=1.0, hp=1e-4):
     log(f"Parameters: beta = {beta}, Pe = {Pe}, hp = {hp}")
     log("=" * 90)
 
-    N_values = ['500', '1000', '2000', '4000']
-    baseline_N = '1000'
+    N_values = ['1000', '2000', '5000', '10000']
+    baseline_N = '5000'
 
     all_data = {}
 

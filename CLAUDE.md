@@ -19,7 +19,7 @@ Key parameters:
 - `--theta`: Contact angle in degrees
 - `--hp`: Precursor film thickness
 - `--Lx`: Domain size (default: 6.0, centered at x=0)
-- `--N`: Number of mesh elements (default: 1000)
+- `--N`: Number of mesh elements (default: 5000)
 - `--output-dir`: Custom output directory (default: script name)
 
 ### Clean Coalescence (No Surfactant)
@@ -96,7 +96,7 @@ Scripts for numerical convergence studies (4 values each, run in parallel):
 ```bash
 ./sensitivity_hp.sh   # Precursor film: hp = 1e-4, 4e-4, 1e-3, 1e-2
 ./sensitivity_Lx.sh   # Domain size: Lx = 6, 8, 10, 12
-./sensitivity_N.sh    # Mesh resolution: N = 500, 1000, 2000, 4000
+./sensitivity_N.sh    # Mesh resolution: N = 1000, 2000, 5000, 10000
 ```
 
 Each script:

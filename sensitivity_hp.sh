@@ -62,6 +62,7 @@ for HP in "${HP_VALUES[@]}"; do
         --Gamma0 $GAMMA0 \
         --theta $THETA \
         --hp $HP \
+        --N 5000 \
         --output-dir "$OUTDIR" > "${OUTDIR}_log.txt" 2>&1 &
     PIDS+=($!)
     echo "Started hp = $HP (PID: $!)"
