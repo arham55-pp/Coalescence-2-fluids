@@ -151,7 +151,7 @@ def check_hp_sensitivity(beta=0.1, Pe=1.0):
     log(f"Parameters: beta = {beta}, Pe = {Pe}")
     log("=" * 90)
 
-    hp_values = ['1e-5', '1e-4', '1e-3', '1e-2']
+    hp_values = ['1e-4', '4e-4', '1e-3', '1e-2']
     baseline_hp = '1e-4'
 
     all_data = {}

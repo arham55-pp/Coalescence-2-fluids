@@ -249,7 +249,7 @@ python check_convergence.py --Lx --beta 0.2   # Custom parameters
 Run parallel simulations with systematic parameter variations:
 
 ```bash
-./sensitivity_hp.sh              # hp = 1e-5, 1e-4, 1e-3, 1e-2
+./sensitivity_hp.sh              # hp = 1e-4, 4e-4, 1e-3, 1e-2
 ./sensitivity_Lx.sh              # Lx = 6, 8, 10, 12
 ./sensitivity_N.sh               # N = 500, 1000, 2000, 4000
 

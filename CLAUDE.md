@@ -94,7 +94,7 @@ The text files contain columns: `coordinate_x`, `h`, `p`, `Gamma` (or just h, p 
 Scripts for numerical convergence studies (4 values each, run in parallel):
 
 ```bash
-./sensitivity_hp.sh   # Precursor film: hp = 1e-5, 1e-4, 1e-3, 1e-2
+./sensitivity_hp.sh   # Precursor film: hp = 1e-4, 4e-4, 1e-3, 1e-2
 ./sensitivity_Lx.sh   # Domain size: Lx = 6, 8, 10, 12
 ./sensitivity_N.sh    # Mesh resolution: N = 500, 1000, 2000, 4000
 ```
