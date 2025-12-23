@@ -53,6 +53,12 @@ plot_dir = f"{base_folder}_plots"
 # Detect if this is a spreading (axisymmetric) or coalescence case
 is_spreading = "spreading" in base_folder.lower()
 
+# Check if output directory exists before listing files
+if not os.path.isdir(output_dir):
+    print(f"Error: Output directory not found: {output_dir}")
+    print(f"Please run the simulation first to generate output files.")
+    sys.exit(1)
+
 files = sorted([f for f in os.listdir(output_dir) if f.endswith('.txt')])
 
 # Create folder for plots
@@ -179,7 +185,8 @@ for f in files:
             # For spreading: track max height and center height
             h0_data.append(np.max(h))
             x0_data.append(0.0)  # not used for spreading
-            h_center_data.append(h[0])  # r=0 is first point
+            # Interpolate to get height at r=0 (x is already sorted)
+            h_center_data.append(np.interp(0.0, x, h))
         else:
             # For coalescence: use find_neck for robust neck detection
             x0, h0 = find_neck(x, h)
