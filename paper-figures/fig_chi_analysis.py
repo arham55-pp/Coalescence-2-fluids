@@ -140,6 +140,15 @@ def main():
     # Style axis
     style_axis(ax1)
 
+    # Add chi_max indicator for Pe = 1000
+    if 1000 in chi_data:
+        chi_max_pe1000 = np.max(chi_data[1000]['chi'])
+        # Draw short horizontal line (black for neutral contrast with viridis)
+        ax1.hlines(chi_max_pe1000, 30, 70, colors='k', linewidth=1.2, zorder=5)
+        # Add label
+        ax1.text(72, chi_max_pe1000, r'$\chi_\mathrm{max}$', fontsize=plt_settings['LabelFont'],
+                 va='center', ha='left')
+
     # Panel label (outside, top left)
     ax1.text(-0.25, 1.05, r'(a)', transform=ax1.transAxes, fontsize=plt_settings['TitleFont'],
              verticalalignment='bottom', fontweight='bold')
@@ -154,9 +163,9 @@ def main():
     # Only use selected beta values
     beta_values = [0.05, 0.1, 0.15, 0.25, 0.5]
 
-    # Setup colormap for beta (use Reds to contrast with viridis in panel a)
+    # Setup colormap for beta (plasma: perceptually uniform, all colors visible)
     beta_norm = plt.Normalize(min(beta_values), max(beta_values))
-    beta_cmap = cm.Reds
+    beta_cmap = cm.plasma
 
     for i, beta in enumerate(beta_values):
         if beta not in csv_data:
