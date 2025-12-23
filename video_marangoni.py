@@ -67,6 +67,9 @@ def compute_limits(folder, beta, bridge_width):
     Gamma_min, Gamma_max = float('inf'), float('-inf')
     T_min, T_max = float('inf'), float('-inf')
 
+    # Skip first few files for T limits (initial step function causes spike)
+    skip_initial = 5
+
     print(f"Scanning {len(files)} files for axis limits...")
 
     for i, f in enumerate(files):
@@ -81,13 +84,14 @@ def compute_limits(folder, beta, bridge_width):
         dGamma_dx = np.gradient(Gamma_b, x_b)
         T_b = -beta * dGamma_dx
 
-        # Update limits
+        # Update limits (skip initial files for T due to step function spike)
         h_min = min(h_min, np.min(h_b))
         h_max = max(h_max, np.max(h_b))
         Gamma_min = min(Gamma_min, np.min(Gamma_b))
         Gamma_max = max(Gamma_max, np.max(Gamma_b))
-        T_min = min(T_min, np.min(T_b))
-        T_max = max(T_max, np.max(T_b))
+        if i >= skip_initial:
+            T_min = min(T_min, np.min(T_b))
+            T_max = max(T_max, np.max(T_b))
 
         if (i + 1) % 100 == 0:
             print(f"  Scanned {i + 1}/{len(files)} files...")
