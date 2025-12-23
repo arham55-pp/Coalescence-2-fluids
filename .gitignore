@@ -12,6 +12,7 @@ lubrication/
 sensitivity_hp_*/
 sensitivity_Lx_*/
 sensitivity_N_*/
+sweep_Pe_beta*/
 *_plots/
 *_frames/
 
