@@ -45,6 +45,8 @@ def parse_args():
                         help="Half-width of bridge region for χ calculation (|x| < width)")
     parser.add_argument("--output", type=str, default=None,
                         help="Output filename (default: {folder}_plots/marangoni_t{time}.pdf)")
+    parser.add_argument("--png", action="store_true",
+                        help="Save as PNG instead of PDF")
     return parser.parse_args()
 
 
@@ -181,7 +183,8 @@ def main():
     if args.output:
         output_path = args.output
     else:
-        output_path = os.path.join(plot_dir, f"marangoni_t{actual_time:.1f}.pdf")
+        ext = "png" if args.png else "pdf"
+        output_path = os.path.join(plot_dir, f"marangoni_t{actual_time:.1f}.{ext}")
 
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
     print(f"\nPlot saved to: {output_path}")
