@@ -84,10 +84,27 @@ def compute_signal_difference(t1, s1, t2, s2, n_points=200):
     Returns:
         rms_pct: Relative RMS difference (%)
         max_pct: Relative max difference (%)
+
+    Raises:
+        ValueError: If time ranges do not overlap.
     """
-    # Interpolate to common time range
+    # Ensure arrays are sorted by time
+    idx1 = np.argsort(t1)
+    t1, s1 = t1[idx1], s1[idx1]
+    idx2 = np.argsort(t2)
+    t2, s2 = t2[idx2], s2[idx2]
+
+    # Find overlapping time range
+    t_start = max(t1[0], t2[0])
     t_max = min(t1[-1], t2[-1])
-    t_common = np.linspace(0, t_max, n_points)
+
+    if t_max <= t_start:
+        raise ValueError(
+            f"No overlapping time range: signal 1 spans [{t1[0]:.3f}, {t1[-1]:.3f}], "
+            f"signal 2 spans [{t2[0]:.3f}, {t2[-1]:.3f}]"
+        )
+
+    t_common = np.linspace(t_start, t_max, n_points)
 
     s1_interp = np.interp(t_common, t1, s1)
     s2_interp = np.interp(t_common, t2, s2)
@@ -122,7 +139,7 @@ def compare_datasets(data_test, data_baseline):
     return results
 
 
-def check_hp_sensitivity(beta=0.1, Pe=1.0, hp_default=1e-4):
+def check_hp_sensitivity(beta=0.1, Pe=1.0):
     """Check convergence for precursor film thickness sensitivity."""
     lines = []
     def log(msg=""):
