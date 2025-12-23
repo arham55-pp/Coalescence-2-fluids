@@ -9,11 +9,11 @@ Physics:
     Γ(x) develops a local maximum. The cancellation index χ quantifies
     the "partial cancellation" of opposing stress lobes:
 
-        χ = |I_T| / I_{|T|}  ∈ [0, 1]
+        χ = 1 - |I_T| / I_{|T|}  ∈ [0, 1]
 
     where I_T = ∫_B T dx (signed) and I_{|T|} = ∫_B |T| dx (unsigned).
-    - χ ≈ 1: one-signed stress (no cancellation)
-    - χ ≈ 0: two opposite-sign lobes (strong cancellation)
+    - χ ≈ 0: one-signed stress (no cancellation)
+    - χ ≈ 1: two opposite-sign lobes (strong cancellation)
 
 Usage:
     python plot_marangoni.py <folder> --time 10.0 --beta 0.1
@@ -110,7 +110,7 @@ def compute_chi(x, T, bridge_width):
     if I_abs_T == 0:
         return np.nan, I_T, I_abs_T
 
-    chi = np.abs(I_T) / I_abs_T
+    chi = 1 - np.abs(I_T) / I_abs_T
     return chi, I_T, I_abs_T
 
 
@@ -135,10 +135,10 @@ def main():
     print(f"\nCancellation Analysis (|x| < {args.bridge_width}):")
     print(f"  I_T (signed)   = {I_T:.6f}")
     print(f"  I_|T| (unsigned) = {I_abs_T:.6f}")
-    print(f"  χ = |I_T|/I_|T| = {chi:.4f}")
-    if chi < 0.3:
+    print(f"  χ = 1 - |I_T|/I_|T| = {chi:.4f}")
+    if chi > 0.7:
         print("  → Strong cancellation (opposing lobes)")
-    elif chi > 0.7:
+    elif chi < 0.3:
         print("  → Weak cancellation (one-signed stress)")
     else:
         print("  → Moderate cancellation")

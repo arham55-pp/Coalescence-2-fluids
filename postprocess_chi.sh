@@ -126,7 +126,7 @@ for pe in pe_values:
         if len(x_bridge) >= 2:
             I_T = np.trapezoid(T_bridge, x_bridge)
             I_abs_T = np.trapezoid(np.abs(T_bridge), x_bridge)
-            chi = np.abs(I_T) / I_abs_T if I_abs_T > 0 else np.nan
+            chi = 1 - np.abs(I_T) / I_abs_T if I_abs_T > 0 else np.nan
         else:
             I_T, I_abs_T, chi = np.nan, np.nan, np.nan
 
@@ -279,7 +279,7 @@ for i, f in enumerate(files):
     if len(x_bridge) >= 2:
         I_T = np.trapezoid(T_bridge, x_bridge)
         I_abs_T = np.trapezoid(np.abs(T_bridge), x_bridge)
-        chi = np.abs(I_T) / I_abs_T if I_abs_T > 0 else np.nan
+        chi = 1 - np.abs(I_T) / I_abs_T if I_abs_T > 0 else np.nan
     else:
         I_T, I_abs_T, chi = np.nan, np.nan, np.nan
 
@@ -318,8 +318,8 @@ ax.set_ylim(0, 1)
 ax.set_xlim(left=0)
 style_axis(ax, xlabel=r'Time $t$', ylabel=r'Cancellation index $\chi$',
            title=rf'Marangoni Stress Cancellation ($\beta = {beta}$)')
-ax.axhspan(0, 0.3, alpha=0.1, color='green', label='Strong cancellation')
-ax.axhspan(0.7, 1.0, alpha=0.1, color='red', label='Weak cancellation')
+ax.axhspan(0, 0.3, alpha=0.1, color='red', label='Weak cancellation')
+ax.axhspan(0.7, 1.0, alpha=0.1, color='green', label='Strong cancellation')
 ax.legend(fontsize=plt_settings['LegendFont'], frameon=False, loc='upper right')
 plt.tight_layout()
 plt.savefig(os.path.join(plot_dir, "chi_vs_time.pdf"), dpi=300, bbox_inches='tight')
