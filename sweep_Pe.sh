@@ -106,7 +106,8 @@ echo ""
 echo "Generating comparison plots..."
 
 # Create comparison plots using Python
-python << PYTHON_SCRIPT
+export BETA
+python << 'PYTHON_SCRIPT'
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -116,9 +117,9 @@ import os
 from postprocess_functions import plt_settings, style_axis, find_neck, find_drop_edge
 
 # Parameters
-beta = $BETA
+beta = float(os.environ['BETA'])
 pe_values = [10, 25, 50, 100, 150, 200, 250, 300, 350, 400, 500, 600, 700, 800, 900, 1000]
-base_dir = 'sweep_Pe_beta${BETA}'
+base_dir = f'sweep_Pe_beta{beta}'
 plot_dir = f'{base_dir}/plots'
 
 # Use log scale for colormap to handle wide range of Pe values
