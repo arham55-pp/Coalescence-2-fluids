@@ -4,9 +4,10 @@ Generate video frames for Marangoni stress visualization.
 
 Creates frames showing:
   - Top panel: Height h(x) and surfactant Γ(x) with dual y-axes
-  - Bottom panel: Marangoni stress T(x) = -β ∂Γ/∂x with fill regions
+  - Bottom panel: Normalized Marangoni stress T/T_max with fill regions
+    (T = -β ∂Γ/∂x, normalized so upper limit is always 1)
 
-Uses two-pass approach: first scan for global axis limits, then generate frames.
+Uses two-pass approach: first scan for global T_max, then generate frames.
 
 Usage:
     python video_marangoni.py coalescence --beta 0.1
@@ -58,14 +59,14 @@ def load_data(filepath):
 def compute_limits(folder, beta, bridge_width):
     """
     First pass: scan all files to determine global min/max values.
-    Returns dict with limits for h, Gamma, and T.
+    Returns dict with limits for h, Gamma, and T_max for normalization.
     """
     domain_dir = os.path.join(folder, "domain")
     files = sorted([f for f in os.listdir(domain_dir) if f.endswith('.txt')])
 
     h_min, h_max = float('inf'), float('-inf')
     Gamma_min, Gamma_max = float('inf'), float('-inf')
-    T_min, T_max = float('inf'), float('-inf')
+    T_max = float('-inf')
 
     # Skip first few files for T limits (initial step function causes spike)
     skip_initial = 5
@@ -90,7 +91,6 @@ def compute_limits(folder, beta, bridge_width):
         Gamma_min = min(Gamma_min, np.min(Gamma_b))
         Gamma_max = max(Gamma_max, np.max(Gamma_b))
         if i >= skip_initial:
-            T_min = min(T_min, np.min(T_b))
             T_max = max(T_max, np.max(T_b))
 
         if (i + 1) % 100 == 0:
@@ -99,17 +99,16 @@ def compute_limits(folder, beta, bridge_width):
     # Add some padding
     h_pad = 0.05 * (h_max - h_min)
     Gamma_pad = 0.05 * (Gamma_max - Gamma_min)
-    T_pad = 0.1 * (T_max - T_min)
 
     limits = {
         'h': (h_min - h_pad, h_max + h_pad),
         'Gamma': (Gamma_min - Gamma_pad, Gamma_max + Gamma_pad),
-        'T': (T_min - T_pad, T_max + T_pad),
+        'T_max': T_max,
     }
 
     print(f"  h range: [{limits['h'][0]:.4f}, {limits['h'][1]:.4f}]")
     print(f"  Γ range: [{limits['Gamma'][0]:.4f}, {limits['Gamma'][1]:.4f}]")
-    print(f"  T range: [{limits['T'][0]:.4f}, {limits['T'][1]:.4f}]")
+    print(f"  T_max: {limits['T_max']:.4f} (normalizing T/T_max, y-limits: -0.2 to 1.0)")
 
     return limits
 
@@ -122,9 +121,10 @@ def generate_frame(filepath, limits, beta, bridge_width, output_path):
     mask = np.abs(x) < bridge_width
     x_b, h_b, Gamma_b = x[mask], h[mask], Gamma[mask]
 
-    # Compute Marangoni stress
+    # Compute Marangoni stress and normalize by T_max
     dGamma_dx = np.gradient(Gamma_b, x_b)
     T_b = -beta * dGamma_dx
+    T_normalized = T_b / limits['T_max']
 
     # Create figure
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 10))
@@ -163,18 +163,18 @@ def generate_frame(filepath, limits, beta, bridge_width, output_path):
     for spine in ax1_twin.spines.values():
         spine.set_linewidth(2)
 
-    # ===== Bottom subplot: Marangoni stress T(x) =====
-    ax2.plot(x_b, T_b, 'k-', linewidth=2.5)
+    # ===== Bottom subplot: Normalized Marangoni stress T/T_max =====
+    ax2.plot(x_b, T_normalized, 'k-', linewidth=2.5)
     ax2.axhline(y=0, color='gray', linestyle='-', alpha=0.5, linewidth=1)
 
     # Fill positive and negative regions
-    ax2.fill_between(x_b, T_b, 0, where=(T_b > 0), alpha=0.4, color='green', label=r'$T > 0$')
-    ax2.fill_between(x_b, T_b, 0, where=(T_b < 0), alpha=0.4, color='purple', label=r'$T < 0$')
+    ax2.fill_between(x_b, T_normalized, 0, where=(T_normalized > 0), alpha=0.4, color='green', label=r'$T > 0$')
+    ax2.fill_between(x_b, T_normalized, 0, where=(T_normalized < 0), alpha=0.4, color='purple', label=r'$T < 0$')
 
     ax2.set_xlim(-bridge_width, bridge_width)
-    ax2.set_ylim(limits['T'])
+    ax2.set_ylim(-0.2, 1.0)
     style_axis(ax2, xlabel=r'Position $x$',
-               ylabel=rf'Marangoni stress $T = -\beta \partial\Gamma/\partial x$')
+               ylabel=r'Normalized stress $T/T_{\max}$')
     ax2.legend(fontsize=plt_settings['LegendFont'], frameon=False, loc='upper right')
 
     plt.tight_layout()
