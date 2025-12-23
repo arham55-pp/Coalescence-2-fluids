@@ -216,9 +216,9 @@ for idx, t_arr, end_idx, label in plot_config:
             temp = 50.0
         dataset_t_range[idx] = (t_valid.min(), temp)
 
-        idx = t_valid <= temp
-        t_valid = t_valid[idx]
-        xf_valid = xf_valid[idx]
+        mask_tmax = t_valid <= temp
+        t_valid = t_valid[mask_tmax]
+        xf_valid = xf_valid[mask_tmax]
 
         print(f"  t_0 = {t0:.2f}")
         print(f"  Valid t range: [{t_valid.min():.2f}, {t_valid.max():.2f}]")
