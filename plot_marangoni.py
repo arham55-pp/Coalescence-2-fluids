@@ -146,18 +146,15 @@ def main():
 
     # Plot 1: Γ(x)
     ax1.plot(x, Gamma, 'b-', linewidth=2.5)
-    ax1.axvline(x=-args.bridge_width, color='gray', linestyle='--', alpha=0.5, linewidth=1.5)
-    ax1.axvline(x=args.bridge_width, color='gray', linestyle='--', alpha=0.5, linewidth=1.5)
-    ax1.axvspan(-args.bridge_width, args.bridge_width, alpha=0.1, color='blue')
     style_axis(ax1, ylabel=r'Surfactant $\Gamma$',
                title=rf'Surfactant and Marangoni Stress at $t = {actual_time:.2f}$')
 
     # Plot 2: T(x) = -β ∂Γ/∂x
     ax2.plot(x, T, 'r-', linewidth=2.5)
     ax2.axhline(y=0, color='k', linestyle='-', alpha=0.3, linewidth=1)
-    ax2.axvline(x=-args.bridge_width, color='gray', linestyle='--', alpha=0.5, linewidth=1.5)
-    ax2.axvline(x=args.bridge_width, color='gray', linestyle='--', alpha=0.5, linewidth=1.5)
-    ax2.axvspan(-args.bridge_width, args.bridge_width, alpha=0.1, color='red')
+
+    # Restrict to bridge region
+    ax2.set_xlim(-args.bridge_width, args.bridge_width)
 
     # Fill positive and negative regions differently
     mask_bridge = np.abs(x) < args.bridge_width
