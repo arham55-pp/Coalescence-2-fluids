@@ -1,6 +1,6 @@
 #!/bin/bash
 # Sensitivity analysis for precursor film thickness h_infty
-# Runs 4 cases in parallel: 1e-5, 1e-4, 1e-3, 1e-2
+# Runs 4 cases in parallel: 1e-4, 4e-4, 1e-3, 1e-2
 #
 # Usage: ./sensitivity_hp.sh [--Pe VALUE] [--beta VALUE]
 #   --Pe VALUE    Péclet number (default: 1.0)
@@ -40,8 +40,8 @@ echo "=============================================="
 GAMMA0=0.8
 THETA=20
 
-# Precursor film values to test (4 values, spanning 4 orders of magnitude)
-HP_VALUES=("9e-5" "1e-4" "1e-3" "1e-2")
+# Precursor film values to test (4 values, spanning 3 orders of magnitude)
+HP_VALUES=("1e-4" "4e-4" "1e-3" "1e-2")
 
 # Clean up old output directories
 for HP in "${HP_VALUES[@]}"; do
@@ -96,9 +96,9 @@ import os
 from postprocess_functions import plt_settings, style_axis, find_neck, find_drop_edge
 
 # Precursor film values
-hp_values = ['1e-5', '1e-4', '1e-3', '1e-2']
+hp_values = ['1e-4', '4e-4', '1e-3', '1e-2']
 colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']
-labels = [r'$h_\infty = 10^{-5}$', r'$h_\infty = 10^{-4}$', r'$h_\infty = 10^{-3}$', r'$h_\infty = 10^{-2}$']
+labels = [r'$h_\infty = 10^{-4}$', r'$h_\infty = 4 \times 10^{-4}$', r'$h_\infty = 10^{-3}$', r'$h_\infty = 10^{-2}$']
 
 plot_dir = 'sensitivity_hp_plots'
 os.makedirs(plot_dir, exist_ok=True)
@@ -149,7 +149,7 @@ if '1e-4' in all_data:
     print(f"  Final x0 = {baseline['x0'][-1]:.6f}")
     print(f"  Final xe = {baseline['xe'][-1]:.6f}")
 
-    for hp_str in ['1e-5', '1e-3', '1e-2']:
+    for hp_str in ['4e-4', '1e-3', '1e-2']:
         if hp_str in all_data:
             data = all_data[hp_str]
             t_common = np.linspace(0, min(baseline['time'][-1], data['time'][-1]), 100)
