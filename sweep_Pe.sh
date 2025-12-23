@@ -2,22 +2,28 @@
 # Parameter sweep for Péclet number
 # Runs 16 cases in batches of 4: Pe = 10, 25, 50, 100, 150, 200, 250, 300, 350, 400, 500, 600, 700, 800, 900, 1000
 #
-# Usage: ./sweep_Pe.sh --beta VALUE
+# Usage: ./sweep_Pe.sh --beta VALUE [--process]
 #   --beta VALUE  Surfactant strength (REQUIRED)
+#   --process     Skip simulations, only run post-processing
 
 set -e  # Exit on error
 
 # Check for required --beta argument
 BETA=""
+PROCESS_ONLY=false
 while [[ $# -gt 0 ]]; do
     case $1 in
         --beta)
             BETA="$2"
             shift 2
             ;;
+        --process)
+            PROCESS_ONLY=true
+            shift
+            ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: $0 --beta VALUE"
+            echo "Usage: $0 --beta VALUE [--process]"
             exit 1
             ;;
     esac
@@ -25,13 +31,16 @@ done
 
 if [[ -z "$BETA" ]]; then
     echo "Error: --beta is required"
-    echo "Usage: $0 --beta VALUE"
+    echo "Usage: $0 --beta VALUE [--process]"
     exit 1
 fi
 
 echo "=============================================="
 echo "Parameter Sweep: Péclet Number"
 echo "Surfactant strength: beta=$BETA"
+if $PROCESS_ONLY; then
+    echo "Mode: Post-processing only"
+fi
 echo "=============================================="
 
 # Péclet number values to test (16 values)
@@ -42,47 +51,56 @@ BATCH_SIZE=4
 BASE_DIR="sweep_Pe_beta${BETA}"
 PLOT_DIR="${BASE_DIR}/plots"
 
-# Clean up old output directories
-echo ""
-echo "Cleaning up old output directories..."
-rm -rf "$BASE_DIR"
-mkdir -p "$BASE_DIR"
-mkdir -p "$PLOT_DIR"
-
-# Launch simulations in batches
-echo ""
-echo "Launching ${#PE_VALUES[@]} simulations in batches of $BATCH_SIZE..."
-echo "----------------------------------------------"
-
-for ((i=0; i<${#PE_VALUES[@]}; i+=BATCH_SIZE)); do
-    PIDS=()
-    BATCH_PE=()
-
-    # Launch batch
-    for ((j=i; j<i+BATCH_SIZE && j<${#PE_VALUES[@]}; j++)); do
-        PE=${PE_VALUES[$j]}
-        OUTDIR="${BASE_DIR}/Pe_${PE}"
-        LOGFILE="${BASE_DIR}/Pe_${PE}_log.txt"
-
-        python coalescence.py \
-            --beta $BETA \
-            --Pe $PE \
-            --output-dir "$OUTDIR" > "$LOGFILE" 2>&1 &
-        PIDS+=($!)
-        BATCH_PE+=($PE)
-        echo "Started Pe = $PE (PID: $!)"
-    done
-
-    # Wait for batch to complete
-    echo "Waiting for batch (Pe = ${BATCH_PE[*]})..."
-    for k in "${!PIDS[@]}"; do
-        wait ${PIDS[$k]}
-        echo "Completed Pe = ${BATCH_PE[$k]}"
-    done
+if $PROCESS_ONLY; then
+    # Check that simulation data exists
+    if [[ ! -d "$BASE_DIR" ]]; then
+        echo "Error: $BASE_DIR not found. Run simulations first without --process flag."
+        exit 1
+    fi
+    mkdir -p "$PLOT_DIR"
+else
+    # Clean up old output directories
     echo ""
-done
+    echo "Cleaning up old output directories..."
+    rm -rf "$BASE_DIR"
+    mkdir -p "$BASE_DIR"
+    mkdir -p "$PLOT_DIR"
 
-echo "All simulations completed!"
+    # Launch simulations in batches
+    echo ""
+    echo "Launching ${#PE_VALUES[@]} simulations in batches of $BATCH_SIZE..."
+    echo "----------------------------------------------"
+
+    for ((i=0; i<${#PE_VALUES[@]}; i+=BATCH_SIZE)); do
+        PIDS=()
+        BATCH_PE=()
+
+        # Launch batch
+        for ((j=i; j<i+BATCH_SIZE && j<${#PE_VALUES[@]}; j++)); do
+            PE=${PE_VALUES[$j]}
+            OUTDIR="${BASE_DIR}/Pe_${PE}"
+            LOGFILE="${BASE_DIR}/Pe_${PE}_log.txt"
+
+            python coalescence.py \
+                --beta $BETA \
+                --Pe $PE \
+                --output-dir "$OUTDIR" > "$LOGFILE" 2>&1 &
+            PIDS+=($!)
+            BATCH_PE+=($PE)
+            echo "Started Pe = $PE (PID: $!)"
+        done
+
+        # Wait for batch to complete
+        echo "Waiting for batch (Pe = ${BATCH_PE[*]})..."
+        for k in "${!PIDS[@]}"; do
+            wait ${PIDS[$k]}
+            echo "Completed Pe = ${BATCH_PE[$k]}"
+        done
+        echo ""
+    done
+
+    echo "All simulations completed!"
+fi
 
 echo ""
 echo "Generating comparison plots..."
@@ -166,7 +184,7 @@ sm = cm.ScalarMappable(cmap=cmap, norm=norm)
 sm.set_array([])
 cbar = plt.colorbar(sm, ax=ax1)
 cbar.set_label(r'$\log_{10}(\mathrm{Pe})$', fontsize=plt_settings['LabelFont'])
-cbar.ax.tick_params(labelsize=plt_settings['AxisFont'])
+cbar.ax.tick_params(labelsize=plt_settings['AxesFont'])
 plt.tight_layout()
 plt.savefig(f'{plot_dir}/h0_vs_time.pdf', dpi=300, bbox_inches='tight')
 plt.close()
@@ -183,7 +201,7 @@ sm = cm.ScalarMappable(cmap=cmap, norm=norm)
 sm.set_array([])
 cbar = plt.colorbar(sm, ax=ax2)
 cbar.set_label(r'$\log_{10}(\mathrm{Pe})$', fontsize=plt_settings['LabelFont'])
-cbar.ax.tick_params(labelsize=plt_settings['AxisFont'])
+cbar.ax.tick_params(labelsize=plt_settings['AxesFont'])
 plt.tight_layout()
 plt.savefig(f'{plot_dir}/x0_vs_time.pdf', dpi=300, bbox_inches='tight')
 plt.close()
@@ -200,7 +218,7 @@ sm = cm.ScalarMappable(cmap=cmap, norm=norm)
 sm.set_array([])
 cbar = plt.colorbar(sm, ax=ax3)
 cbar.set_label(r'$\log_{10}(\mathrm{Pe})$', fontsize=plt_settings['LabelFont'])
-cbar.ax.tick_params(labelsize=plt_settings['AxisFont'])
+cbar.ax.tick_params(labelsize=plt_settings['AxesFont'])
 plt.tight_layout()
 plt.savefig(f'{plot_dir}/xe_vs_time.pdf', dpi=300, bbox_inches='tight')
 plt.close()
@@ -226,7 +244,7 @@ sm = cm.ScalarMappable(cmap=cmap, norm=norm)
 sm.set_array([])
 cbar = fig4.colorbar(sm, cax=cbar_ax)
 cbar.set_label(r'$\log_{10}(\mathrm{Pe})$', fontsize=plt_settings['LabelFont'])
-cbar.ax.tick_params(labelsize=plt_settings['AxisFont'])
+cbar.ax.tick_params(labelsize=plt_settings['AxesFont'])
 
 plt.savefig(f'{plot_dir}/sweep_Pe_combined.pdf', dpi=300, bbox_inches='tight')
 plt.close()
