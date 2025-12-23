@@ -157,7 +157,7 @@ print("="*60)
 for pe in pe_values:
     if pe in all_data:
         d = all_data[pe]
-        print(f"Pe = {pe:4d}: Final χ = {d['chi'][-1]:.4f}, Min χ = {np.nanmin(d['chi']):.4f}")
+        print(f"Pe = {pe:4d}: Final χ = {d['chi'][-1]:.4f}, Max χ = {np.nanmax(d['chi']):.4f}")
 
 # Generate comparison plot
 fig, ax = plt.subplots(figsize=(10, 8))
