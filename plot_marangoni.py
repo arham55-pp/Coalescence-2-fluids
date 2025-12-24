@@ -20,7 +20,9 @@ Usage:
     python plot_marangoni.py coalescence --time 50.0 --beta 0.1 --bridge-width 0.5
 
 Output:
-    Saves plot to {folder}_plots/marangoni_t{time}.pdf
+    Saves plots to {folder}_plots/:
+    - marangoni_t{time}.pdf: Γ(x) and Marangoni stress T(x)
+    - velocity_t{time}.pdf: Surface velocity u_s and its components
 """
 import argparse
 import os
@@ -81,18 +83,19 @@ def find_closest_file(folder, target_time):
 
 
 def load_data(filepath):
-    """Load x, h, Gamma from data file."""
+    """Load x, h, p, Gamma from data file."""
     with open(filepath) as f:
         f.readline()  # skip header
         data = np.loadtxt(f)
 
     x = data[:, 0]
     h = data[:, 1]
+    p = data[:, 2]
     Gamma = data[:, 3]
 
     # Sort by x
     sort_idx = np.argsort(x)
-    return x[sort_idx], h[sort_idx], Gamma[sort_idx]
+    return x[sort_idx], h[sort_idx], p[sort_idx], Gamma[sort_idx]
 
 
 def compute_chi(x, T, bridge_width):
@@ -123,11 +126,17 @@ def main():
     print(f"Requested time: {args.time}, Actual time: {actual_time:.4f}")
 
     # Load data
-    x, h, Gamma = load_data(filepath)
+    x, h, p, Gamma = load_data(filepath)
 
     # Compute Marangoni stress: T = -β ∂Γ/∂x
     dGamma_dx = np.gradient(Gamma, x)
     T = -args.beta * dGamma_dx
+
+    # Compute surface velocity components
+    dp_dx = np.gradient(p, x)
+    u_pressure = -h**2 / 2 * dp_dx           # Pressure-driven component
+    u_marangoni = -args.beta * h * dGamma_dx # Marangoni component
+    u_s = u_pressure + u_marangoni           # Total surface velocity
 
     # Compute cancellation index
     chi, I_T, I_abs_T = compute_chi(x, T, args.bridge_width)
@@ -179,15 +188,41 @@ def main():
     # Save figure
     plot_dir = f"{args.folder}_plots"
     os.makedirs(plot_dir, exist_ok=True)
+    ext = "png" if args.png else "pdf"
 
     if args.output:
         output_path = args.output
     else:
-        ext = "png" if args.png else "pdf"
         output_path = os.path.join(plot_dir, f"marangoni_t{actual_time:.1f}.{ext}")
 
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
     print(f"\nPlot saved to: {output_path}")
+    plt.close()
+
+    # Create velocity figure
+    fig2, ax_vel = plt.subplots(figsize=(10, 5))
+
+    # Plot all three curves
+    ax_vel.plot(x, u_s, '-', color='#1f77b4', linewidth=2.5, label=r'$u_s$')
+    ax_vel.plot(x, u_pressure, '-', color='#ff7f0e', linewidth=2.5,
+                label=r'$-h^2 \partial_x p/2$')
+    ax_vel.plot(x, u_marangoni, '-', color='#9467bd', linewidth=2.5,
+                label=r'$-\beta h \partial_x \Gamma$')
+
+    ax_vel.axhline(y=0, color='gray', linestyle='-', alpha=0.5, linewidth=1)
+    ax_vel.set_xlim(-args.bridge_width, args.bridge_width)
+
+    style_axis(ax_vel, xlabel=r'Position $x$',
+               ylabel=r'Surface velocity $u_s$',
+               title=rf'Surface Velocity Components at $t = {actual_time:.2f}$')
+    ax_vel.legend(fontsize=plt_settings['LegendFont'], frameon=False, loc='best')
+
+    plt.tight_layout()
+
+    # Save velocity figure
+    vel_output_path = os.path.join(plot_dir, f"velocity_t{actual_time:.1f}.{ext}")
+    plt.savefig(vel_output_path, dpi=300, bbox_inches='tight')
+    print(f"Velocity plot saved to: {vel_output_path}")
     plt.close()
 
 
