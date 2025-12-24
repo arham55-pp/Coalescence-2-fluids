@@ -17,6 +17,13 @@ import sys
 
 from postprocess_functions import find_neck, find_drop_edge
 
+# Display names for sensitivity parameters
+PARAM_DISPLAY_NAMES = {
+    'hp': 'PRECURSOR FILM THICKNESS',
+    'Lx': 'DOMAIN SIZE',
+    'N': 'MESH RESOLUTION',
+}
+
 
 def load_simulation_data(outdir, hp=1e-4):
     """
@@ -139,53 +146,71 @@ def compare_datasets(data_test, data_baseline):
     return results
 
 
-def check_hp_sensitivity(beta=0.1, Pe=1.0):
-    """Check convergence for precursor film thickness sensitivity."""
+def _check_sensitivity(param_name, param_values, baseline_value, outdir_template,
+                       beta, Pe, hp, hp_from_value=False):
+    """
+    Generic sensitivity analysis for a single parameter.
+
+    Args:
+        param_name: Name of parameter being varied (e.g., 'hp', 'Lx', 'N')
+        param_values: List of parameter value strings to test
+        baseline_value: Which value to use as baseline for comparison
+        outdir_template: Format string for output directory (e.g., 'sensitivity_hp_{}')
+        beta: Surfactant strength parameter
+        Pe: Péclet number
+        hp: Precursor film thickness (used for xe threshold)
+        hp_from_value: If True, derive hp from each param value (for hp sensitivity)
+
+    Returns:
+        all_data: Dict mapping param values to loaded data
+    """
     lines = []
     def log(msg=""):
         print(msg)
         lines.append(msg)
 
-    log("=" * 90)
-    log("SENSITIVITY ANALYSIS: PRECURSOR FILM THICKNESS (hp)")
-    log(f"Parameters: beta = {beta}, Pe = {Pe}")
-    log("=" * 90)
+    display_name = PARAM_DISPLAY_NAMES.get(param_name, param_name.upper())
 
-    hp_values = ['1e-4', '4e-4', '1e-3', '1e-2']
-    baseline_hp = '1e-4'
+    log("=" * 90)
+    log(f"SENSITIVITY ANALYSIS: {display_name} ({param_name})")
+    if hp_from_value:
+        log(f"Parameters: beta = {beta}, Pe = {Pe}")
+    else:
+        log(f"Parameters: beta = {beta}, Pe = {Pe}, hp = {hp}")
+    log("=" * 90)
 
     all_data = {}
 
-    for hp_str in hp_values:
-        outdir = f'sensitivity_hp_{hp_str}'
-        hp_val = float(hp_str)
+    for val in param_values:
+        outdir = outdir_template.format(val)
+        hp_val = float(val) if hp_from_value else hp
         log(f"\nLoading {outdir}...")
         data = load_simulation_data(outdir, hp=hp_val)
         if data is None:
             log(f"  No data found")
             continue
 
-        all_data[hp_str] = data
+        all_data[val] = data
         log(f"  t_max = {data['time'][-1]:.1f}, {len(data['time'])} timesteps")
 
     # Compute signal differences
-    if baseline_hp in all_data:
-        baseline = all_data[baseline_hp]
+    if baseline_value in all_data:
+        baseline = all_data[baseline_value]
         log(f"\n{'-' * 90}")
-        log(f"Signal differences (baseline: hp = {baseline_hp})")
+        log(f"Signal differences (baseline: {param_name} = {baseline_value})")
         log(f"{'-' * 90}")
-        log(f"{'hp':<10} {'h0 RMS%':<10} {'h0 Max%':<10} {'x0 RMS%':<10} {'x0 Max%':<10} {'xe RMS%':<10} {'xe Max%':<10}")
+        log(f"{param_name:<10} {'h0 RMS%':<10} {'h0 Max%':<10} {'x0 RMS%':<10} {'x0 Max%':<10} {'xe RMS%':<10} {'xe Max%':<10}")
         log(f"{'-' * 90}")
 
         max_h0_rms, max_h0_max = 0, 0
         max_x0_rms, max_x0_max = 0, 0
         max_xe_rms, max_xe_max = 0, 0
 
-        for hp_str in hp_values:
-            if hp_str not in all_data or hp_str == baseline_hp:
+        for val in param_values:
+            if val not in all_data or val == baseline_value:
                 continue
 
-            diff = compare_datasets(all_data[hp_str], baseline)
+            diff = compare_datasets(all_data[val], baseline)
             if diff is None:
                 continue
 
@@ -196,176 +221,58 @@ def check_hp_sensitivity(beta=0.1, Pe=1.0):
             max_xe_rms = max(max_xe_rms, diff['xe_rms'])
             max_xe_max = max(max_xe_max, diff['xe_max'])
 
-            log(f"{hp_str:<10} {diff['h0_rms']:<10.2f} {diff['h0_max']:<10.2f} "
+            log(f"{val:<10} {diff['h0_rms']:<10.2f} {diff['h0_max']:<10.2f} "
                 f"{diff['x0_rms']:<10.2f} {diff['x0_max']:<10.2f} "
                 f"{diff['xe_rms']:<10.2f} {diff['xe_max']:<10.2f}")
 
         log(f"\n{'=' * 90}")
-        log(f"SUMMARY (hp: {baseline_hp} baseline):")
+        log(f"SUMMARY ({param_name}: {baseline_value} baseline):")
         log(f"  h0(t): max RMS = {max_h0_rms:.2f}%, max peak = {max_h0_max:.2f}%")
         log(f"  x0(t): max RMS = {max_x0_rms:.2f}%, max peak = {max_x0_max:.2f}%")
         log(f"  xe(t): max RMS = {max_xe_rms:.2f}%, max peak = {max_xe_max:.2f}%")
         log(f"{'=' * 90}")
 
     # Save to file
-    filename = f'check-convergence-Pe{Pe}_beta{beta}-hp.txt'
+    filename = f'check-convergence-Pe{Pe}_beta{beta}-{param_name}.txt'
     with open(filename, 'w') as f:
         f.write('\n'.join(lines) + '\n')
     print(f"\nResults saved to {filename}")
 
     return all_data
+
+
+def check_hp_sensitivity(beta=0.1, Pe=1.0):
+    """Check convergence for precursor film thickness sensitivity."""
+    return _check_sensitivity(
+        param_name='hp',
+        param_values=['1e-4', '4e-4', '1e-3', '1e-2'],
+        baseline_value='1e-4',
+        outdir_template='sensitivity_hp_{}',
+        beta=beta, Pe=Pe, hp=1e-4,
+        hp_from_value=True
+    )
 
 
 def check_Lx_sensitivity(beta=0.1, Pe=1.0, hp=1e-4):
     """Check convergence for domain size sensitivity."""
-    lines = []
-    def log(msg=""):
-        print(msg)
-        lines.append(msg)
-
-    log("=" * 90)
-    log("SENSITIVITY ANALYSIS: DOMAIN SIZE (Lx)")
-    log(f"Parameters: beta = {beta}, Pe = {Pe}, hp = {hp}")
-    log("=" * 90)
-
-    Lx_values = ['6', '8', '10', '12']
-    baseline_Lx = '6'
-
-    all_data = {}
-
-    for Lx in Lx_values:
-        outdir = f'sensitivity_Lx_{Lx}'
-        log(f"\nLoading {outdir}...")
-        data = load_simulation_data(outdir, hp=hp)
-        if data is None:
-            log(f"  No data found")
-            continue
-
-        all_data[Lx] = data
-        log(f"  t_max = {data['time'][-1]:.1f}, {len(data['time'])} timesteps")
-
-    # Compute signal differences
-    if baseline_Lx in all_data:
-        baseline = all_data[baseline_Lx]
-        log(f"\n{'-' * 90}")
-        log(f"Signal differences (baseline: Lx = {baseline_Lx})")
-        log(f"{'-' * 90}")
-        log(f"{'Lx':<10} {'h0 RMS%':<10} {'h0 Max%':<10} {'x0 RMS%':<10} {'x0 Max%':<10} {'xe RMS%':<10} {'xe Max%':<10}")
-        log(f"{'-' * 90}")
-
-        max_h0_rms, max_h0_max = 0, 0
-        max_x0_rms, max_x0_max = 0, 0
-        max_xe_rms, max_xe_max = 0, 0
-
-        for Lx in Lx_values:
-            if Lx not in all_data or Lx == baseline_Lx:
-                continue
-
-            diff = compare_datasets(all_data[Lx], baseline)
-            if diff is None:
-                continue
-
-            max_h0_rms = max(max_h0_rms, diff['h0_rms'])
-            max_h0_max = max(max_h0_max, diff['h0_max'])
-            max_x0_rms = max(max_x0_rms, diff['x0_rms'])
-            max_x0_max = max(max_x0_max, diff['x0_max'])
-            max_xe_rms = max(max_xe_rms, diff['xe_rms'])
-            max_xe_max = max(max_xe_max, diff['xe_max'])
-
-            log(f"{Lx:<10} {diff['h0_rms']:<10.2f} {diff['h0_max']:<10.2f} "
-                f"{diff['x0_rms']:<10.2f} {diff['x0_max']:<10.2f} "
-                f"{diff['xe_rms']:<10.2f} {diff['xe_max']:<10.2f}")
-
-        log(f"\n{'=' * 90}")
-        log(f"SUMMARY (Lx: {baseline_Lx} baseline):")
-        log(f"  h0(t): max RMS = {max_h0_rms:.2f}%, max peak = {max_h0_max:.2f}%")
-        log(f"  x0(t): max RMS = {max_x0_rms:.2f}%, max peak = {max_x0_max:.2f}%")
-        log(f"  xe(t): max RMS = {max_xe_rms:.2f}%, max peak = {max_xe_max:.2f}%")
-        log(f"{'=' * 90}")
-
-    # Save to file
-    filename = f'check-convergence-Pe{Pe}_beta{beta}-Lx.txt'
-    with open(filename, 'w') as f:
-        f.write('\n'.join(lines) + '\n')
-    print(f"\nResults saved to {filename}")
-
-    return all_data
+    return _check_sensitivity(
+        param_name='Lx',
+        param_values=['6', '8', '10', '12'],
+        baseline_value='6',
+        outdir_template='sensitivity_Lx_{}',
+        beta=beta, Pe=Pe, hp=hp
+    )
 
 
 def check_N_sensitivity(beta=0.1, Pe=1.0, hp=1e-4):
     """Check convergence for mesh resolution sensitivity."""
-    lines = []
-    def log(msg=""):
-        print(msg)
-        lines.append(msg)
-
-    log("=" * 90)
-    log("SENSITIVITY ANALYSIS: MESH RESOLUTION (N)")
-    log(f"Parameters: beta = {beta}, Pe = {Pe}, hp = {hp}")
-    log("=" * 90)
-
-    N_values = ['1000', '2000', '5000', '10000']
-    baseline_N = '5000'
-
-    all_data = {}
-
-    for N in N_values:
-        outdir = f'sensitivity_N_{N}'
-        log(f"\nLoading {outdir}...")
-        data = load_simulation_data(outdir, hp=hp)
-        if data is None:
-            log(f"  No data found")
-            continue
-
-        all_data[N] = data
-        log(f"  t_max = {data['time'][-1]:.1f}, {len(data['time'])} timesteps")
-
-    # Compute signal differences
-    if baseline_N in all_data:
-        baseline = all_data[baseline_N]
-        log(f"\n{'-' * 90}")
-        log(f"Signal differences (baseline: N = {baseline_N})")
-        log(f"{'-' * 90}")
-        log(f"{'N':<10} {'h0 RMS%':<10} {'h0 Max%':<10} {'x0 RMS%':<10} {'x0 Max%':<10} {'xe RMS%':<10} {'xe Max%':<10}")
-        log(f"{'-' * 90}")
-
-        max_h0_rms, max_h0_max = 0, 0
-        max_x0_rms, max_x0_max = 0, 0
-        max_xe_rms, max_xe_max = 0, 0
-
-        for N in N_values:
-            if N not in all_data or N == baseline_N:
-                continue
-
-            diff = compare_datasets(all_data[N], baseline)
-            if diff is None:
-                continue
-
-            max_h0_rms = max(max_h0_rms, diff['h0_rms'])
-            max_h0_max = max(max_h0_max, diff['h0_max'])
-            max_x0_rms = max(max_x0_rms, diff['x0_rms'])
-            max_x0_max = max(max_x0_max, diff['x0_max'])
-            max_xe_rms = max(max_xe_rms, diff['xe_rms'])
-            max_xe_max = max(max_xe_max, diff['xe_max'])
-
-            log(f"{N:<10} {diff['h0_rms']:<10.2f} {diff['h0_max']:<10.2f} "
-                f"{diff['x0_rms']:<10.2f} {diff['x0_max']:<10.2f} "
-                f"{diff['xe_rms']:<10.2f} {diff['xe_max']:<10.2f}")
-
-        log(f"\n{'=' * 90}")
-        log(f"SUMMARY (N: {baseline_N} baseline):")
-        log(f"  h0(t): max RMS = {max_h0_rms:.2f}%, max peak = {max_h0_max:.2f}%")
-        log(f"  x0(t): max RMS = {max_x0_rms:.2f}%, max peak = {max_x0_max:.2f}%")
-        log(f"  xe(t): max RMS = {max_xe_rms:.2f}%, max peak = {max_xe_max:.2f}%")
-        log(f"{'=' * 90}")
-
-    # Save to file
-    filename = f'check-convergence-Pe{Pe}_beta{beta}-N.txt'
-    with open(filename, 'w') as f:
-        f.write('\n'.join(lines) + '\n')
-    print(f"\nResults saved to {filename}")
-
-    return all_data
+    return _check_sensitivity(
+        param_name='N',
+        param_values=['1000', '2000', '5000', '10000'],
+        baseline_value='5000',
+        outdir_template='sensitivity_N_{}',
+        beta=beta, Pe=Pe, hp=hp
+    )
 
 
 def main():
