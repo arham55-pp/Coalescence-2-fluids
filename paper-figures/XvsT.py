@@ -192,15 +192,15 @@ def make_uncompensated_plot(indices_to_plot, show_refline=True):
         t_ref = np.logspace(np.log10(0.1), np.log10(100), 100)
         ax.loglog(t_ref, 0.03 * t_ref**1.5, 'k-', linewidth=2.5, label=r'$\sim t^{3/2}$')
 
-    ax.set_xlabel(r'$t$')
-    ax.set_ylabel(r'$x$')
+    ax.set_xlabel(r'$t$', fontsize=14)
+    ax.set_ylabel(r'$x_0$', fontsize=14)
 
     # Set consistent axis limits for all versions
     ax.set_xlim([0.1, 1000])
     ax.set_ylim([2e-3, 0.7])
 
     if len(indices_to_plot) > 0:
-        ax.legend(loc='lower right', fontsize=7, handletextpad=0.3, labelspacing=0.3)
+        ax.legend(loc='upper left', fontsize=7, handletextpad=0.3, labelspacing=0.3)
 
     fig.tight_layout()
     return fig, ax
@@ -232,8 +232,8 @@ def make_compensated_plot(indices_to_plot, show_refline=True):
         t_ref = np.logspace(np.log10(0.1), np.log10(100), 100)
         ax.loglog(t_ref, 8.4 * t_ref**1.5, 'k-', linewidth=2.5, label=r'$\sim t^{3/2}$')
 
-    ax.set_xlabel(r'$t$')
-    ax.set_ylabel(r'$x / \left(\frac{c_v \beta \Gamma_0 \sqrt{\mathrm{Pe}}}{3\sqrt{\pi}}\right)$')
+    ax.set_xlabel(r'$t$', fontsize=14)
+    ax.set_ylabel(r'$x_0 / \left(\frac{c_v \beta \Gamma_0 \sqrt{\mathrm{Pe}}}{3\sqrt{\pi}}\right)$', fontsize=14)
 
     # Set consistent axis limits for all versions
     ax.set_xlim([0.1, 1000])
