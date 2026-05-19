@@ -60,8 +60,8 @@ def parse_args():
                         help="Surfactant strength (β)")
     parser.add_argument("--Pe", type=float, default=1.0,
                         help="Péclet number")
-    parser.add_argument("--Gamma0", type=float, default=0.8,
-                        help="Initial surfactant concentration")
+   # parser.add_argument("--Gamma0", type=float, default=0.8,
+                   #     help="Initial surfactant concentration")
     # Geometry parameters
     parser.add_argument("--theta", type=float, default=20.0,
                         help="Contact angle in degrees")
@@ -86,7 +86,7 @@ def print_parameters(args):
     print("\nSurfactant Parameters:")
     print(f"  beta (β)           = {args.beta}")
     print(f"  Pe (Péclet)        = {args.Pe}")
-    print(f"  Gamma0 (Γ₀)        = {args.Gamma0}")
+    ##print(f"  Gamma0 (Γ₀)        = {args.Gamma0}")
     print("\nGeometry Parameters:")
     print(f"  theta              = {args.theta}°")
     print(f"  hp (precursor)     = {args.hp}")
@@ -126,7 +126,7 @@ class DropletCoalescence(Problem):
 		# Surfactant parameters (see paper §2.2)
 		self.beta = args.beta       # surfactant strength (β)
 		self.Pe = args.Pe           # Péclet number
-		self.Gamma0 = args.Gamma0   # initial surfactant concentration
+		#self.Gamma0 = args.Gamma0   # initial surfactant concentration
 		# self.plotter = PlotterTry(self)
 		self._step_count = 0
 		self._progress_interval = 100  # print progress every N timesteps
@@ -145,9 +145,9 @@ class DropletCoalescence(Problem):
 		self.add_mesh(LineMesh(minimum=-self.Lx/2, size=self.Lx, N=self.N)) 
 		
 		h=var("h") 
-		Gamma=var("Gamma")
+		c=var("c")
 
-		# self.sigma=self.sigma-self.ma*Gamma
+		self.sigma=1-self.beta*c
 
 		eqs=LubricationEquations(beta=self.beta, Pe=self.Pe) # equations
 		eqs+=MeshFileOutput() # output	
@@ -163,9 +163,9 @@ class DropletCoalescence(Problem):
 		h_init = maximum(maximum(h1, h2), self.hp) 
 
 		# Surfactant IC: Γ = Γ₀ on left droplet (x<0), Γ = 0 on right droplet (x>0)
-		Gamma_init = self.Gamma0 * (0.5 - 0.5*tanh(var("coordinate_x") / self.hp))
+		c_init = 
 		
-		eqs+=InitialCondition(Gamma=Gamma_init)
+		eqs+=InitialCondition(c=c_init)
 		eqs+=InitialCondition(h=h_init) 
 		
 		eqs+=SpatialErrorEstimator(h=1) # refine based on the height field
