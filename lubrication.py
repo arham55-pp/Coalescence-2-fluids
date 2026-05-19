@@ -24,13 +24,14 @@ class LubricationEquations(Equations):
 	def define_fields(self):
 		self.define_scalar_field("h","C2")
 		self.define_scalar_field("p","C2")		
-		self.define_scalar_field("Gamma","C2")
+		self.define_scalar_field("c","C2")
+		self.define_scalar_field("psi","C2") # 1D coordinate field
 		
 	def define_residuals(self):
 		h,eta=var_and_test("h")
 		p,q=var_and_test("p")
-		Gamma,phi=var_and_test("Gamma")
-		self.add_residual(weak(partial_t(h),eta) + weak(h**3/3*grad(p) + self.beta*h**2/2*grad(Gamma), grad(eta)))
+		c,phi=var_and_test("c")
+		self.add_residual(weak(partial_t(h),eta) + weak(h**3/3*grad(p) + self.beta*h**2/2*grad(c), grad(eta)))
 		self.add_residual(weak(p,q) - weak((1 - self.beta*Gamma)*grad(h), grad(q)))
 		self.add_residual(weak(partial_t(Gamma),phi) + weak(h**2/2*Gamma*grad(p) + self.beta*h*Gamma*grad(Gamma) + 1/self.Pe*grad(Gamma), grad(phi)))
 		
