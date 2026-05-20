@@ -32,15 +32,15 @@ class LubricationEquations(Equations):
 		p,q=var_and_test("p")
 		c,phi=var_and_test("c")
 		self.add_residual(weak(partial_t(h),eta) + weak(h**3/3*grad(p) + self.beta*h**2/2*grad(c), grad(eta)))
-		self.add_residual(weak(p,q) - weak((1 - self.beta*Gamma)*grad(h), grad(q)))
-		self.add_residual(weak(partial_t(Gamma),phi) + weak(h**2/2*Gamma*grad(p) + self.beta*h*Gamma*grad(Gamma) + 1/self.Pe*grad(Gamma), grad(phi)))
-		
+		self.add_residual(weak(p,q) - weak((1 - self.beta*c)*grad(h), grad(q)))
+		self.add_residual(weak(partial_t(c*h),phi) + weak(h**3/3*c*grad(p)) + self.beta*h**2/2*grad(c) + h*1/self.Pe*grad(c), grad(phi))
+"""		
 class LubricationProblem(Problem):
-	"""
+	
 	Simple test problem: thin film instability with surfactant.
 	Not the coalescence simulation - just a sanity check for the equations.
-	For coalescence, use coalescence.py instead.
-	"""
+	For calescence, use coalescence.py instead.
+	
 	def define_problem(self):
 		self.add_mesh(LineMesh(N=100))
 		eqs = LubricationEquations()  # uses defaults: beta=0.1, Pe=1.0
@@ -54,3 +54,4 @@ class LubricationProblem(Problem):
 if __name__ == "__main__":
 	with LubricationProblem() as problem:
 		problem.run(50, outstep=True, startstep=0.25)
+"""

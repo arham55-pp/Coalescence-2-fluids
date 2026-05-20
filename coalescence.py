@@ -147,7 +147,7 @@ class DropletCoalescence(Problem):
 		h=var("h") 
 		c=var("c")
 
-		self.sigma=1-self.beta*c
+		#self.sigma=1-self.beta*c
 
 		eqs=LubricationEquations(beta=self.beta, Pe=self.Pe) # equations
 		eqs+=MeshFileOutput() # output	
@@ -163,7 +163,7 @@ class DropletCoalescence(Problem):
 		h_init = maximum(maximum(h1, h2), self.hp) 
 
 		# Surfactant IC: Γ = Γ₀ on left droplet (x<0), Γ = 0 on right droplet (x>0)
-		c_init = 
+		c_init =  (0.5 - 0.5*tanh(var("coordinate_x") / self.hp))
 		
 		eqs+=InitialCondition(c=c_init)
 		eqs+=InitialCondition(h=h_init) 
@@ -173,7 +173,7 @@ class DropletCoalescence(Problem):
 
 		# self+=TextFileOutputAlongLine(filename='profile', start=(-3,0), end=(3,0), N =200) @ "domain"
 		
-		self.add_equations(eqs@"domain") # adding the equation
+		self.add_equations(eqs @ "domain") # adding the equation
 		
 if __name__=="__main__":
 	args = parse_args()
