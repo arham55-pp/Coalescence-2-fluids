@@ -24,16 +24,16 @@ class LubricationEquations(Equations):
 	def define_fields(self):
 		self.define_scalar_field("h","C2")
 		self.define_scalar_field("p","C2")		
-		self.define_scalar_field("c","C2")
 		self.define_scalar_field("psi","C2") # 1D coordinate field
 		
 	def define_residuals(self):
 		h,eta=var_and_test("h")
 		p,q=var_and_test("p")
-		c,phi=var_and_test("c")
+		psi,phi=var_and_test("psi")
+		c=psi/h
 		self.add_residual(weak(partial_t(h),eta) + weak(h**3/3*grad(p) + self.beta*h**2/2*grad(c), grad(eta)))
 		self.add_residual(weak(p,q) - weak((1 - self.beta*c)*grad(h), grad(q)))
-		self.add_residual(weak(partial_t(c*h),phi) + weak(h**3/3*c*grad(p)) + self.beta*h**2/2*grad(c) + h*1/self.Pe*grad(c), grad(phi))
+		self.add_residual(weak(partial_t(c*h),phi) + weak(h**3/3*c*grad(p) + self.beta*h**2/2*grad(c) + h*1/self.Pe*grad(c), grad(phi)))
 """		
 class LubricationProblem(Problem):
 	

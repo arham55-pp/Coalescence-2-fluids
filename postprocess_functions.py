@@ -4,11 +4,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.signal import find_peaks
 
-# Publication-quality matplotlib configuration
-matplotlib.rcParams['font.family'] = 'serif'
-matplotlib.rcParams['font.serif'] = ['Computer Modern Roman']
-matplotlib.rcParams['text.usetex'] = True
-matplotlib.rcParams['text.latex.preamble'] = r'\usepackage{amsmath}'
+# Publication-quality matplotlib configuration (without LaTeX)
+matplotlib.rcParams['font.family'] = 'sans-serif'
+matplotlib.rcParams['font.sans-serif'] = ['DejaVu Sans']
+matplotlib.rcParams['text.usetex'] = False
+matplotlib.rcParams['mathtext.fontset'] = 'dejavusans'
+matplotlib.rcParams['mathtext.default'] = 'regular'
 matplotlib.rcParams['figure.dpi'] = 150
 matplotlib.rcParams['lines.linewidth'] = 2.5
 

@@ -1,39 +1,4 @@
-"""
-Droplet coalescence simulation with insoluble surfactants.
 
-This script simulates the early-time coalescence of two viscous sessile drops
-on a substrate, where the left drop is coated with an insoluble surfactant
-monolayer and the right drop is initially clean. The resulting surfactant
-gradient drives Marangoni stresses that modify the coalescence dynamics.
-
-Physical Setup (see paper Section 2.1):
-    Two spherical-cap drops with contact angle theta touch at x=0.
-    Initial geometry:
-        - Drop centers at x = ±sqrt(2RH - H^2)
-        - Sphere radius: R = L/sin(theta)
-        - Apex height: H = L(1-cos(theta))/sin(theta)
-
-    A precursor film of thickness h_p covers the substrate, regularizing
-    the contact line and enabling the lubrication formulation.
-
-Surfactant Configuration:
-    - Left drop (x < 0): uniform surfactant concentration Gamma_0
-    - Right drop (x > 0): clean interface (Gamma = 0)
-    - The step is smoothed using tanh(x/h_p) for numerical stability
-
-Key Results:
-    - Low Pe: Bridge height grows as h_0 = 0.272(1 - beta*Gamma_0/2)*theta^4*t
-    - Low Pe: Marangoni-driven drift x_0 ~ t^(3/2)
-    - Maximum lateral excursion scales as x_f ~ beta*Pe
-    - Critical strength beta_c ~ 0.15 separates coalescence from non-coalescence
-
-Usage:
-    python coalescence.py --beta 0.1 --Pe 1.0 --Gamma0 0.8 --theta 20
-
-Output:
-    Creates directory with domain/domain_XXXXXX.txt files containing
-    (x, h, p, Gamma) at each output time.
-"""
 import argparse
 import os
 import sys
@@ -69,9 +34,9 @@ def parse_args():
                         help="Precursor film thickness")
     parser.add_argument("--Lx", type=float, default=6.0,
                         help="Domain size")
-    parser.add_argument("--N", type=int, default=5000,
+    parser.add_argument("--N", type=int, default=4000,
                         help="Number of mesh elements")
-    parser.add_argument("--max-refinement-level", type=int, default=6,
+    parser.add_argument("--max-refinement-level", type=int, default=5,
                         help="Max adaptive mesh refinement level")
     parser.add_argument("--output-dir", type=str, default=None,
                         help="Output directory (default: script name)")
@@ -84,11 +49,11 @@ def print_parameters(args):
     print("DROPLET COALESCENCE SIMULATION - PARAMETERS")
     print("="*60)
     print("\nSurfactant Parameters:")
-    print(f"  beta (β)           = {args.beta}")
-    print(f"  Pe (Péclet)        = {args.Pe}")
-    ##print(f"  Gamma0 (Γ₀)        = {args.Gamma0}")
+    print(f"  beta               = {args.beta}")
+    print(f"  Pe (Peclet)        = {args.Pe}")
+    ##print(f"  Gamma0 (Gamma_0)        = {args.Gamma0}")
     print("\nGeometry Parameters:")
-    print(f"  theta              = {args.theta}°")
+    print(f"  theta (degrees)    = {args.theta}")
     print(f"  hp (precursor)     = {args.hp}")
     print(f"  Lx (domain size)   = {args.Lx}")
     print(f"  N (elements)       = {args.N}")
@@ -97,7 +62,7 @@ def print_parameters(args):
         print(f"  output_dir         = {args.output_dir}")
     print("="*60 + "\n")
 
-class PlotterTry(MatplotlibPlotter):
+'''class PlotterTry(MatplotlibPlotter):
 	def __init__(self, problem: Problem, filetrunk: str = "plot_{:05d}", fileext: str | List[str] = "png", eigenvector: int | None = None, eigenmode: MeshDataEigenModes = "abs", add_eigen_to_mesh_positions: bool = True, position_eigen_scale: float = 1):
 		super().__init__(problem, filetrunk, fileext, eigenvector, eigenmode, add_eigen_to_mesh_positions, position_eigen_scale)
 
@@ -108,7 +73,7 @@ class PlotterTry(MatplotlibPlotter):
 		self.set_view(-3, 0, 0 , 2.05)
 
 		self.add_plot("domain/h", colorbar=colorbar_1)
-
+'''
 class DropletCoalescence(Problem):
 	def __init__(self, args):
 		super(DropletCoalescence, self).__init__()
@@ -163,13 +128,17 @@ class DropletCoalescence(Problem):
 		h_init = maximum(maximum(h1, h2), self.hp) 
 
 		# Surfactant IC: Γ = Γ₀ on left droplet (x<0), Γ = 0 on right droplet (x>0)
-		c_init =  (0.5 - 0.5*tanh(var("coordinate_x") / self.hp))
+		psi_init =  (0.5 - 0.5*tanh(var("coordinate_x") / self.hp))*h_init
 		
-		eqs+=InitialCondition(c=c_init)
+
 		eqs+=InitialCondition(h=h_init) 
+		eqs+=InitialCondition(psi=psi_init)
+		
 		
 		eqs+=SpatialErrorEstimator(h=1) # refine based on the height field
 		eqs += TextFileOutput()
+		IntegralObservables(c_integral=var("psi"))
+		IntegralObservableOutput("evolution")
 
 		# self+=TextFileOutputAlongLine(filename='profile', start=(-3,0), end=(3,0), N =200) @ "domain"
 		
@@ -187,7 +156,7 @@ if __name__=="__main__":
 			old_stdout_fd = os.dup(1)
 			os.dup2(devnull.fileno(), 1)
 			try:
-				problem.run(100,outstep=0.1,startstep=0.01,maxstep=50,temporal_error=1,spatial_adapt=1)
+				problem.run(200,outstep=0.1,startstep=0.01,maxstep=50,temporal_error=1,spatial_adapt=1)
 			finally:
 				os.dup2(old_stdout_fd, 1)
 				os.close(old_stdout_fd)

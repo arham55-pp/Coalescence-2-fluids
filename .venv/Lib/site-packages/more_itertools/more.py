@@ -1,4 +1,5 @@
 import math
+import types
 
 from collections import Counter, defaultdict, deque
 from collections.abc import Sequence
@@ -433,6 +434,8 @@ class peekable:
 
         """
         self._cache.extendleft(reversed(items))
+
+    __class_getitem__ = classmethod(types.GenericAlias)
 
     def __next__(self):
         if self._cache:
@@ -2402,10 +2405,14 @@ class numeric_range(Sequence):
         )
 
     def __reversed__(self):
+        # Empty iterator
+        try:
+            start = self._get_by_index(-1)
+        except IndexError:
+            return iter([])
+
         return iter(
-            numeric_range(
-                self._get_by_index(-1), self._start - self._step, -self._step
-            )
+            numeric_range(start, self._start - self._step, -self._step)
         )
 
     def count(self, value):
@@ -2663,8 +2670,10 @@ def _islice_helper(it, s):
 
         if start < 0:
             # Consume all but the last -start items
-            cache = deque(enumerate(it, 1), maxlen=-start)
-            len_iter = cache[-1][0] if cache else 0
+            counter = count(1)
+            wrapper = compress(it, counter)
+            cache = deque(wrapper, maxlen=-start)
+            len_iter = next(counter) - 1
 
             # Adjust start to be positive
             i = max(len_iter + start, 0)
@@ -2687,7 +2696,7 @@ def _islice_helper(it, s):
                     # pop and yield the item.
                     # We don't want to use an intermediate variable
                     # it would extend the lifetime of the current item
-                    yield cache.popleft()[1]
+                    yield cache.popleft()
                 else:
                     # just pop and discard the item
                     cache.popleft()
@@ -2718,8 +2727,10 @@ def _islice_helper(it, s):
         if (stop is not None) and (stop < 0):
             # Consume all but the last items
             n = -stop - 1
-            cache = deque(enumerate(it, 1), maxlen=n)
-            len_iter = cache[-1][0] if cache else 0
+            counter = count(1)
+            wrapper = compress(it, counter)
+            cache = deque(wrapper, maxlen=n)
+            len_iter = next(counter) - 1
 
             # If start and stop are both negative they are comparable and
             # we can just slice. Otherwise we can adjust start to be negative
@@ -2729,8 +2740,7 @@ def _islice_helper(it, s):
             else:
                 i, j = min(start - len_iter, -1), None
 
-            for index, item in list(cache)[i:j:step]:
-                yield item
+            yield from list(cache)[i:j:step]
         else:
             # Advance to the stop position
             if stop is not None:
@@ -2997,6 +3007,16 @@ class seekable:
         >>> elements
         SequenceView(['0', '1', '2', '3'])
 
+    Indexing the :class:`seekable` directly returns items from the cache:
+
+        >>> it = seekable((str(n) for n in range(10)))
+        >>> next(it), next(it), next(it)
+        ('0', '1', '2')
+        >>> it[-1]
+        '2'
+        >>> it[0]
+        '0'
+
     By default, the cache grows as the source iterable progresses, so beware of
     wrapping very large or infinite iterables. Supply *maxlen* to limit the
     size of the cache (this of course limits how far back you can seek).
@@ -3073,6 +3093,9 @@ class seekable:
             self._index = len(self._cache)
 
         self.seek(max(self._index + count, 0))
+
+    def __getitem__(self, index):
+        return self._cache[index]
 
 
 class run_length:
@@ -5364,18 +5387,42 @@ class serialize:
     threads.
     """
 
-    __slots__ = ('iterator', 'lock')
+    __slots__ = ('_iterator', '_lock')
 
     def __init__(self, iterable):
-        self.iterator = iter(iterable)
-        self.lock = Lock()
+        self._iterator = iter(iterable)
+        self._lock = Lock()
 
     def __iter__(self):
         return self
 
     def __next__(self):
-        with self.lock:
-            return next(self.iterator)
+        with self._lock:
+            return next(self._iterator)
+
+    def send(self, value, /):
+        """Send a value to a generator.
+
+        Raises AttributeError if not a generator.
+        """
+        with self._lock:
+            return self._iterator.send(value)
+
+    def throw(self, *args):
+        """Call throw() on a generator.
+
+        Raises AttributeError if not a generator.
+        """
+        with self._lock:
+            return self._iterator.throw(*args)
+
+    def close(self):
+        """Call close() on a generator.
+
+        Raises AttributeError if not a generator.
+        """
+        with self._lock:
+            return self._iterator.close()
 
 
 def synchronized(func):

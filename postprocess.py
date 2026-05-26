@@ -42,13 +42,20 @@ Key Metrics Extracted:
     - x_0(t): Horizontal position of neck minimum
     - Gamma_max(t): Maximum surfactant concentration
 """
+import matplotlib
+matplotlib.use('Agg')  # Non-interactive backend
+matplotlib.rcParams['text.usetex'] = False  # Disable LaTeX rendering
+matplotlib.rcParams['text.latex.preamble'] = r''  # Empty LaTeX preamble
+matplotlib.rcParams['mathtext.fontset'] = 'dejavusans'  # Use DejaVu font for math
+matplotlib.rcParams['mathtext.default'] = 'regular'  # Use regular text for math
+matplotlib.rcParams['figure.constrained_layout.use'] = False  # Disable constrained layout
+matplotlib.rcParams['pdf.use14corefonts'] = True
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 import sys
 from matplotlib.gridspec import GridSpec
 from postprocess_functions import plt_settings, style_axis, find_neck
-
 # Get base folder from command line, default to "coalescence"
 base_folder = sys.argv[1] if len(sys.argv) > 1 else "coalescence"
 output_dir = f"{base_folder}/domain"
@@ -65,7 +72,7 @@ time_data = []
 h0_data = []       # neck height
 x0_data = []       # neck position
 h_max_data = []
-gamma_max_data = []
+c_max_data = []
 
 # Read first and last files to understand the evolution
 with open(os.path.join(output_dir, files[0])) as f:
@@ -92,24 +99,24 @@ for idx, file_idx in enumerate(selected_indices):
         data = np.loadtxt(f)
         x = data[:, 0]
         h = data[:, 1]
-        gamma = data[:, 3]
+        c = data[:, 3]/data[:,1]
 
         ax1.plot(x, h, color=colors[idx])
-        ax2.plot(x, gamma, color=colors[idx])
+        ax2.plot(x, c, color=colors[idx])
 
-style_axis(ax1, ylabel=r'Height $h$', title=r'Evolution of Droplet Coalescence with Surfactants')
-style_axis(ax2, xlabel=r'Position $x$', ylabel=r'Surfactant concentration $\Gamma$')
+style_axis(ax1, ylabel='Height h', title='Evolution of Droplet Coalescence with Surfactants')
+style_axis(ax2, xlabel='Position x', ylabel='Volume Fraction Field')
 
 # Add colorbar for time
 sm = plt.cm.ScalarMappable(cmap='viridis', norm=plt.Normalize(vmin=time_values[0], vmax=time_values[-1]))
 sm.set_array([])
 cbar = fig1.colorbar(sm, ax=[ax1, ax2], location='right', shrink=0.6, pad=0.08)
-cbar.set_label(r'Time $t$', fontsize=plt_settings['ColorbarFont'], labelpad=10)
+cbar.set_label('Time t', fontsize=plt_settings['ColorbarFont'], labelpad=10)
 cbar.ax.tick_params(labelsize=plt_settings['AxesFont'])
 
-plt.savefig(f'{plot_dir}/height_surfactant_evolution.pdf', dpi=300)
+plt.savefig(f'{plot_dir}/height_c_evolution.png', dpi=150, bbox_inches='tight')
 plt.close()
-
+'''
 # Plot 2: Spacetime diagram of height
 print("Creating spacetime diagram...")
 times = []
@@ -138,13 +145,13 @@ x = x_common
 
 fig2, ax = plt.subplots(figsize=(12, 8))
 im = ax.pcolormesh(x, times, height_matrix, shading='auto', cmap='viridis')
-style_axis(ax, xlabel=r'Position $x$', ylabel=r'Time $t$', title=r'Spacetime Evolution of Film Height')
+style_axis(ax, xlabel='Position x', ylabel='Time t', title='Spacetime Evolution of Film Height')
 cbar = plt.colorbar(im, ax=ax)
-cbar.set_label(r'Height $h$', fontsize=plt_settings['ColorbarFont'], labelpad=10)
+cbar.set_label('Height h', fontsize=plt_settings['ColorbarFont'], labelpad=10)
 cbar.ax.tick_params(labelsize=plt_settings['AxesFont'])
-plt.savefig(f'{plot_dir}/spacetime_height.pdf', dpi=300, bbox_inches='tight')
+plt.savefig(f'{plot_dir}/spacetime_height.png', dpi=150, bbox_inches='tight')
 plt.close()
-
+'''
 # Plot 3: Time series analysis
 print("Analyzing time series data...")
 for f in files:
@@ -154,43 +161,44 @@ for f in files:
         data = np.loadtxt(file)
         x = data[:, 0]
         h = data[:, 1]
-        gamma = data[:, 3]
+        c = data[:, 3]/data[:,1]
         
         time_data.append(time)
         x0, h0 = find_neck(x, h)
         x0_data.append(x0)
         h0_data.append(h0)
         h_max_data.append(np.max(h))
-        gamma_max_data.append(np.max(np.abs(gamma)))
+        c_max_data.append(np.max(np.abs(c)))
 
 fig3 = plt.figure(figsize=(14, 10))
 gs = GridSpec(2, 2, figure=fig3)
 
 ax1 = fig3.add_subplot(gs[0, 0])
 ax1.plot(time_data, h0_data, 'b-', linewidth=3)
-style_axis(ax1, xlabel=r'Time $t$', ylabel=r'Neck height $h_0$',
-           title=r'Neck Height Evolution')
+style_axis(ax1, xlabel='Time t', ylabel='Neck height h_0',
+           title='Neck Height Evolution')
 
 ax2 = fig3.add_subplot(gs[0, 1])
 ax2.plot(time_data, x0_data, 'g-', linewidth=3)
-style_axis(ax2, xlabel=r'Time $t$', ylabel=r'Neck position $x_0$',
-           title=r'Neck Position Evolution')
+style_axis(ax2, xlabel='Time t', ylabel='Neck position x_0',
+           title='Neck Position Evolution')
 
-ax3 = fig3.add_subplot(gs[1, 0])
+'''ax3 = fig3.add_subplot(gs[1, 0])
 ax3.plot(time_data, h_max_data, 'r-', linewidth=3)
-style_axis(ax3, xlabel=r'Time $t$', ylabel=r'Maximum height $h_{\max}$',
-           title=r'Maximum Height Evolution')
+style_axis(ax3, xlabel='Time t', ylabel='Maximum height h_max',
+           title='Maximum Height Evolution')
 
 ax4 = fig3.add_subplot(gs[1, 1])
-ax4.semilogy(time_data, gamma_max_data, 'm-', linewidth=3)
-style_axis(ax4, xlabel=r'Time $t$', ylabel=r'Max $|\Gamma|$',
-           title=r'Maximum Surfactant Concentration')
-
+ax4.semilogy(time_data, c_max_data, 'm-', linewidth=3)
+style_axis(ax4, xlabel='Time t', ylabel='Max surfactant concentration',
+           title='Maximum Surfactant Concentration')
+'''
 plt.tight_layout()
-plt.savefig(f'{plot_dir}/time_series_analysis.pdf', dpi=300, bbox_inches='tight')
+plt.savefig(f'{plot_dir}/time_series_analysis.png', dpi=150, bbox_inches='tight')
 plt.close()
 
 # Plot 4: Zoom on the bridge region
+
 print("Creating bridge region plot...")
 fig4, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 12), sharex=True)
 
@@ -220,19 +228,19 @@ for idx, (stage, color, label) in enumerate(zip(stages, colors, labels)):
         p_sorted = p[mask][sort_idx]
         gamma_sorted = gamma[mask][sort_idx]
 
-        ax1.plot(x_sorted, h_sorted, color=color, linewidth=3, label=f'{label} ($t={time:.1f}$)')
+        ax1.plot(x_sorted, h_sorted, color=color, linewidth=3, label=f'{label} (t={time:.1f})')
         ax2.plot(x_sorted, p_sorted, color=color, linewidth=3)
         ax3.plot(x_sorted, gamma_sorted, color=color, linewidth=3)
 
-style_axis(ax1, ylabel=r'Height $h$', title=r'Bridge Region Evolution During Coalescence')
+style_axis(ax1, ylabel='Height h', title='Bridge Region Evolution During Coalescence')
 ax1.legend(fontsize=plt_settings['LegendFont'], frameon=False)
 
-style_axis(ax2, ylabel=r'Pressure $p$')
+style_axis(ax2, ylabel='Pressure p')
 
-style_axis(ax3, xlabel=r'Position $x$', ylabel=r'Surfactant $\Gamma$')
+style_axis(ax3, xlabel='Position x', ylabel='Volume fraction field')
 
 plt.tight_layout()
-plt.savefig(f'{plot_dir}/bridge_region_zoom.pdf', dpi=300, bbox_inches='tight')
+plt.savefig(f'{plot_dir}/bridge_region_zoom.png', dpi=150, bbox_inches='tight')
 plt.close()
 
 # Plot 5: Neck trajectory (x0 vs h0)
@@ -252,17 +260,17 @@ for idx in arrow_indices:
                 xytext=(x0_data[idx], h0_data[idx]),
                 arrowprops=dict(arrowstyle='->', color='black', alpha=0.5, lw=2))
 
-style_axis(ax, xlabel=r'Neck position $x_0$', ylabel=r'Neck height $h_0$',
-           title=r'Neck Trajectory During Coalescence')
+style_axis(ax, xlabel='Neck position x_0', ylabel='Neck height h_0',
+           title='Neck Trajectory During Coalescence')
 
 # Add colorbar for time
 sm = plt.cm.ScalarMappable(cmap=plt.cm.plasma, norm=plt.Normalize(vmin=time_data[0], vmax=time_data[-1]))
 sm.set_array([])
 cbar = plt.colorbar(sm, ax=ax)
-cbar.set_label(r'Time $t$', fontsize=plt_settings['ColorbarFont'], labelpad=10)
+cbar.set_label('Time t', fontsize=plt_settings['ColorbarFont'], labelpad=10)
 cbar.ax.tick_params(labelsize=plt_settings['AxesFont'])
 
-plt.savefig(f'{plot_dir}/neck_trajectory.pdf', dpi=300, bbox_inches='tight')
+plt.savefig(f'{plot_dir}/neck_trajectory.png', dpi=150, bbox_inches='tight')
 plt.close()
 
 print(f"All plots have been saved to the '{plot_dir}' folder!")
