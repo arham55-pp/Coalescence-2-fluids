@@ -56,6 +56,27 @@ import os
 import sys
 from matplotlib.gridspec import GridSpec
 from postprocess_functions import plt_settings, style_axis, find_neck
+
+
+def calculate_x0_global_maximum(time, x0):
+    """
+    Find the global maximum of the neck location x_0(t).
+
+    Returns:
+    --------
+    tuple
+        (global_max_time, global_max_value)
+    """
+    time = np.asarray(time)
+    x0 = np.asarray(x0)
+
+    if len(x0) == 0:
+        return None, None
+
+    global_max_idx = np.argmax(x0)
+    return time[global_max_idx], x0[global_max_idx]
+
+
 # Get base folder from command line, default to "coalescence"
 base_folder = sys.argv[1] if len(sys.argv) > 1 else "coalescence"
 output_dir = f"{base_folder}/domain"
@@ -153,6 +174,8 @@ plt.savefig(f'{plot_dir}/spacetime_height.png', dpi=150, bbox_inches='tight')
 plt.close()
 '''
 # Plot 3: Time series analysis
+
+#INPUT DATA
 print("Analyzing time series data...")
 for f in files:
     with open(os.path.join(output_dir, f)) as file:
@@ -170,33 +193,127 @@ for f in files:
         h_max_data.append(np.max(h))
         c_max_data.append(np.max(np.abs(c)))
 
+
+
+# Convert to numpy arrays for easier manipulation
+time_data = np.array(time_data)
+h0_data = np.array(h0_data)
+x0_data = np.array(x0_data)
+'''
+# Detect discontinuities in h0_data and x0_data
+coalescence_times = []
+
+# Calculate differences between consecutive points
+dh0 = np.abs(np.diff(h0_data))
+dx0 = np.abs(np.diff(x0_data))
+
+# Find discontinuities using a threshold (e.g., 2 standard deviations above mean)
+threshold_h0 = np.mean(dh0) + 2 * np.std(dh0)
+threshold_x0 = np.mean(dx0) + 2 * np.std(dx0)
+
+# Find indices where discontinuities occur
+h0_discontinuity_indices = np.where(dh0 > threshold_h0)[0]
+x0_discontinuity_indices = np.where(dx0 > threshold_x0)[0]
+
+# Combine and sort discontinuity indices
+all_discontinuity_indices = np.unique(np.concatenate([h0_discontinuity_indices, x0_discontinuity_indices]))
+
+# Skip the first 20% of data to avoid false positives at the beginning
+skip_points = max(1, int(0.2 * len(time_data)))
+all_discontinuity_indices = all_discontinuity_indices[all_discontinuity_indices >= skip_points]
+
+if len(all_discontinuity_indices) > 0:
+    # Store only the first discontinuity time after the skip region
+    first_discontinuity_idx = all_discontinuity_indices[0]
+    coalescence_times.append(time_data[first_discontinuity_idx + 1])
+
+coalescence_times = np.array(coalescence_times)'''
+
+# Filter time_data to only include positive times, then compute log
+valid_time_mask = time_data > 0
+time_data_valid = time_data[valid_time_mask]
+h0_data_valid = h0_data[valid_time_mask]
+x0_data_valid = x0_data[valid_time_mask]
+
+# Remove oscillating points where neck position is near zero
+# These points are typically noisy and don't represent true dynamics
+# Using a very small threshold to only catch extreme oscillations
+h0_threshold = 1e-5  # Minimum magnitude of neck height to include
+valid_h0_mask = np.abs(h0_data_valid) > h0_threshold
+time_data_valid = time_data_valid[valid_h0_mask]
+h0_data_valid = h0_data_valid[valid_h0_mask]
+x0_data_valid = x0_data_valid[valid_h0_mask]
+
+log_time_data = np.log(time_data_valid)
+log_h0_data = np.log(h0_data_valid)
+log_x0_data = np.log(np.abs(x0_data_valid))
+
+x0_global_max_time, x0_global_max_value = calculate_x0_global_maximum(time_data_valid, x0_data_valid)
+
+if x0_global_max_time is not None:
+    print(f"\nGlobal maximum of neck position x_0: t = {x0_global_max_time:.6f}, x_0 = {x0_global_max_value:.6f}")
+
+
 fig3 = plt.figure(figsize=(14, 10))
 gs = GridSpec(2, 2, figure=fig3)
 
 ax1 = fig3.add_subplot(gs[0, 0])
-ax1.plot(time_data, h0_data, 'b-', linewidth=3)
+ax1.scatter(time_data_valid, h0_data_valid, c='b', s=50, zorder=3)
 style_axis(ax1, xlabel='Time t', ylabel='Neck height h_0',
            title='Neck Height Evolution')
 
 ax2 = fig3.add_subplot(gs[0, 1])
-ax2.plot(time_data, x0_data, 'g-', linewidth=3)
+ax2.scatter(time_data_valid, x0_data_valid, c='g', s=50, zorder=3)
 style_axis(ax2, xlabel='Time t', ylabel='Neck position x_0',
            title='Neck Position Evolution')
-
-'''ax3 = fig3.add_subplot(gs[1, 0])
-ax3.plot(time_data, h_max_data, 'r-', linewidth=3)
-style_axis(ax3, xlabel='Time t', ylabel='Maximum height h_max',
-           title='Maximum Height Evolution')
-
-ax4 = fig3.add_subplot(gs[1, 1])
-ax4.semilogy(time_data, c_max_data, 'm-', linewidth=3)
-style_axis(ax4, xlabel='Time t', ylabel='Max surfactant concentration',
-           title='Maximum Surfactant Concentration')
-'''
+           
 plt.tight_layout()
 plt.savefig(f'{plot_dir}/time_series_analysis.png', dpi=150, bbox_inches='tight')
 plt.close()
 
+# Plot 3b: Log-log time series analysis with t^alpha scaling
+print("Creating log-log time series plot")
+
+# Parameters for straight line: y = 10^c * x^m
+m1 = 0.9 # slope
+c1 = -5.4 # intercept
+m2=0.67
+c2=-6
+fig3b = plt.figure(figsize=(14, 10))
+gs3b = GridSpec(2, 2, figure=fig3b)
+
+ax1 = fig3b.add_subplot(gs3b[0, 0])
+ax1.plot(log_time_data, log_h0_data, 'bo', markersize=6, linestyle='none', label='Neck height h_0')
+style_axis(ax1, xlabel='Time t', ylabel='Neck height h_0',
+           title=f'Neck Height Evolution (Log-Log Scale)')
+ax1.legend(fontsize=plt_settings['LegendFont'], frameon=False, loc='best')
+ax1.grid(True, which='both', alpha=0.3)
+
+# Add straight line with slope m1 and intercept c1 to ax1
+x_line = np.linspace(log_time_data.min(), log_time_data.max(), 100)
+y_line = c1 + m1 *x_line
+ax1.plot(x_line, y_line, 'k-', linewidth=2.5)
+ax1.legend(fontsize=plt_settings['LegendFont'], frameon=False, loc='best')
+
+ax2 = fig3b.add_subplot(gs3b[0, 1])
+ax2.plot(log_time_data, log_x0_data, 'go', markersize=6, linestyle='none', label='Neck position |x_0|')
+style_axis(ax2, xlabel='Time t', ylabel='Neck position',
+           title=f'Neck Position Evolution (Log-Log Scale)')
+ax2.legend(fontsize=plt_settings['LegendFont'], frameon=False, loc='best')
+ax2.grid(True, which='both', alpha=0.3)
+
+# Add straight line with slope m2 and intercept c2 to ax2
+y_line_ax2 = c2 + m2*x_line
+ax2.plot(x_line, y_line_ax2, 'k-', linewidth=3)
+ax2.legend(fontsize=plt_settings['LegendFont'], frameon=False, loc='best')
+
+
+plt.tight_layout()
+plt.savefig(f'{plot_dir}/time_series_analysis_loglog.png', dpi=150, bbox_inches='tight')
+plt.close()
+
+
+\
 # Plot 4: Zoom on the bridge region
 
 print("Creating bridge region plot...")
@@ -215,7 +332,7 @@ for idx, (stage, color, label) in enumerate(zip(stages, colors, labels)):
         x = data[:, 0]
         h = data[:, 1]
         p = data[:, 2]
-        gamma = data[:, 3]
+        c = data[:, 3]/data[:, 1]
 
         # Bridge is at x=0 where the two drops meet
         x_bridge = 0.0
@@ -226,11 +343,11 @@ for idx, (stage, color, label) in enumerate(zip(stages, colors, labels)):
         x_sorted = x[mask][sort_idx]
         h_sorted = h[mask][sort_idx]
         p_sorted = p[mask][sort_idx]
-        gamma_sorted = gamma[mask][sort_idx]
+        c_sorted = c[mask][sort_idx]
 
         ax1.plot(x_sorted, h_sorted, color=color, linewidth=3, label=f'{label} (t={time:.1f})')
         ax2.plot(x_sorted, p_sorted, color=color, linewidth=3)
-        ax3.plot(x_sorted, gamma_sorted, color=color, linewidth=3)
+        ax3.plot(x_sorted, c_sorted, color=color, linewidth=3)
 
 style_axis(ax1, ylabel='Height h', title='Bridge Region Evolution During Coalescence')
 ax1.legend(fontsize=plt_settings['LegendFont'], frameon=False)
@@ -248,23 +365,23 @@ print("Creating neck trajectory plot...")
 fig5, ax = plt.subplots(figsize=(10, 10))
 
 # Use color gradient for time
-colors = plt.cm.plasma(np.linspace(0, 1, len(time_data)))
+colors = plt.cm.plasma(np.linspace(0, 1, len(time_data_valid)))
 
-ax.scatter(x0_data, h0_data, c=colors, alpha=0.7, s=80, edgecolors='w', linewidth=0.5, zorder=3)
-ax.plot(x0_data, h0_data, 'k-', alpha=0.3, linewidth=1, zorder=2)
+ax.scatter(x0_data_valid, h0_data_valid, c=colors, alpha=0.7, s=80, edgecolors='w', linewidth=0.5, zorder=3)
+ax.plot(x0_data_valid, h0_data_valid, 'k-', alpha=0.3, linewidth=1, zorder=2)
 
 # Add arrows to show direction
-arrow_indices = np.linspace(0, len(x0_data)-2, 10, dtype=int)
+arrow_indices = np.linspace(0, len(x0_data_valid)-2, 10, dtype=int)
 for idx in arrow_indices:
-    ax.annotate('', xy=(x0_data[idx+1], h0_data[idx+1]),
-                xytext=(x0_data[idx], h0_data[idx]),
+    ax.annotate('', xy=(x0_data_valid[idx+1], h0_data_valid[idx+1]),
+                xytext=(x0_data_valid[idx], h0_data_valid[idx]),
                 arrowprops=dict(arrowstyle='->', color='black', alpha=0.5, lw=2))
 
 style_axis(ax, xlabel='Neck position x_0', ylabel='Neck height h_0',
            title='Neck Trajectory During Coalescence')
 
 # Add colorbar for time
-sm = plt.cm.ScalarMappable(cmap=plt.cm.plasma, norm=plt.Normalize(vmin=time_data[0], vmax=time_data[-1]))
+sm = plt.cm.ScalarMappable(cmap=plt.cm.plasma, norm=plt.Normalize(vmin=time_data_valid[0], vmax=time_data_valid[-1]))
 sm.set_array([])
 cbar = plt.colorbar(sm, ax=ax)
 cbar.set_label('Time t', fontsize=plt_settings['ColorbarFont'], labelpad=10)
@@ -275,6 +392,134 @@ plt.close()
 
 print(f"All plots have been saved to the '{plot_dir}' folder!")
 print(f"Total number of timesteps analyzed: {len(files)}")
-print(f"Time range: {time_data[0]:.2f} to {time_data[-1]:.2f}")
-print(f"Final neck height: {h0_data[-1]:.6f}")
-print(f"Final neck position: {x0_data[-1]:.6f}")
+print(f"Time range (filtered): {time_data_valid[0]:.2f} to {time_data_valid[-1]:.2f}")
+print(f"Final neck height: {h0_data_valid[-1]:.6f}")
+print(f"Final neck position: {x0_data_valid[-1]:.6f}")
+#print(f"\nLog-log plot generated with α={ALPHA} (edit ALPHA at the top to change the t^alpha exponent)")
+'''
+
+# ============================================================================
+# Function to extract slopes for parameter sweep
+# ============================================================================
+def extract_slopes(base_folder, beta=None, Pe=None):
+    """
+    Extract slopes from neck height and neck position data.
+    
+    Parameters:
+    -----------
+    base_folder : str
+        Base folder containing the simulation output
+    beta : float, optional
+        Surfactant elasticity parameter
+    Pe : float, optional
+        Peclet number
+    
+    Returns:
+    --------
+    tuple : (beta, Pe, m_h0, m_x0)
+        Array of [beta, Pe, slope_from_h0, slope_from_x0]
+        Returns None if computation fails
+    """
+    try:
+        output_dir = f"{base_folder}/domain"
+        if not os.path.exists(output_dir):
+            print(f"Warning: {output_dir} does not exist")
+            return None
+        
+        files = sorted([f for f in os.listdir(output_dir) if f.endswith('.txt')])
+        if len(files) == 0:
+            print(f"Warning: No data files found in {output_dir}")
+            return None
+        
+        # Collect time series data
+        time_data_sweep = []
+        h0_data_sweep = []
+        x0_data_sweep = []
+        
+        for f in files:
+            with open(os.path.join(output_dir, f)) as file:
+                header = file.readline()
+                time = float(header.split('@time=')[-1])
+                data = np.loadtxt(file)
+                x = data[:, 0]
+                h = data[:, 1]
+                
+                time_data_sweep.append(time)
+                x0, h0 = find_neck(x, h)
+                x0_data_sweep.append(x0)
+                h0_data_sweep.append(h0)
+        
+        time_data_sweep = np.array(time_data_sweep)
+        h0_data_sweep = np.array(h0_data_sweep)
+        x0_data_sweep = np.array(x0_data_sweep)
+        
+        # Filter time_data to only include positive times
+        valid_time_mask = time_data_sweep > 0
+        time_data_sweep = time_data_sweep[valid_time_mask]
+        h0_data_sweep = h0_data_sweep[valid_time_mask]
+        x0_data_sweep = x0_data_sweep[valid_time_mask]
+        
+        # Remove oscillating points where neck position is near zero BEFORE discontinuity detection
+        x0_threshold = 1e-3  # Minimum magnitude of neck position to include
+        valid_x0_mask = np.abs(x0_data_sweep) > x0_threshold
+        time_data_sweep = time_data_sweep[valid_x0_mask]
+        h0_data_sweep = h0_data_sweep[valid_x0_mask]
+        x0_data_sweep = x0_data_sweep[valid_x0_mask]
+        
+        # Detect discontinuities
+        dh0 = np.abs(np.diff(h0_data_sweep))
+        dx0 = np.abs(np.diff(x0_data_sweep))
+        
+        threshold_h0 = np.mean(dh0) + 2 * np.std(dh0)
+        threshold_x0 = np.mean(dx0) + 2 * np.std(dx0)
+        
+        h0_discontinuity_indices = np.where(dh0 > threshold_h0)[0]
+        x0_discontinuity_indices = np.where(dx0 > threshold_x0)[0]
+        
+        all_discontinuity_indices = np.unique(np.concatenate([h0_discontinuity_indices, x0_discontinuity_indices]))
+        
+        # Skip the first 20% of data
+        skip_points = max(1, int(0.2 * len(time_data_sweep)))
+        all_discontinuity_indices = all_discontinuity_indices[all_discontinuity_indices >= skip_points]
+        
+        # Use discontinuity if detected, otherwise use full dataset
+        if len(all_discontinuity_indices) > 0:
+            coalescence_time = time_data_sweep[all_discontinuity_indices[0] + 1]
+            log_coalescence_time = np.log(coalescence_time)
+            
+            log_time_data = np.log(time_data_sweep)
+            filter_mask = log_time_data < log_coalescence_time
+            time_filtered = time_data_sweep[filter_mask]
+            h0_filtered = h0_data_sweep[filter_mask]
+            x0_filtered = x0_data_sweep[filter_mask]
+            log_time_filtered = log_time_data[filter_mask]
+        else:
+            # No discontinuity detected, use full dataset
+            time_filtered = time_data_sweep
+            h0_filtered = h0_data_sweep
+            x0_filtered = x0_data_sweep
+            log_time_filtered = np.log(time_data_sweep)
+        
+        if len(time_filtered) < 2:
+            print(f"Warning: Not enough data points for beta={beta}, Pe={Pe}")
+            return None
+        
+        # Ensure positive values and fit
+        h0_filtered = np.maximum(h0_filtered, 1e-10)
+        x0_filtered = np.maximum(np.abs(x0_filtered), 1e-10)
+        
+        log_h0_filtered = np.log(h0_filtered)
+        log_x0_filtered = np.log(x0_filtered)
+        
+        # Fit lines
+        coeffs_h0 = np.polyfit(log_time_filtered, log_h0_filtered, 1)
+        m_h0 = coeffs_h0[0]
+        
+        coeffs_x0 = np.polyfit(log_time_filtered, log_x0_filtered, 1)
+        m_x0 = coeffs_x0[0]
+        
+        return np.array([beta, Pe, m_h0, m_x0])
+    
+    except Exception as e:
+        print(f"Error processing beta={beta}, Pe={Pe}: {str(e)}")
+        return None'''

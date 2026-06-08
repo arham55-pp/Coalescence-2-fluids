@@ -1,0 +1,20 @@
+t = 3.90t = 7.30t = 15.50t = 25.20t = 35.20t = 45.20t = 55.20t = 65.20t = 75.20t = 85.20t = 95.20t = 105.20t = 115.20t = 125.20t = 135.20t = 145.20t = 155.20t = 165.20t = 175.20t = 185.20t = 195.20
+============================================================
+DROPLET COALESCENCE SIMULATION - PARAMETERS
+============================================================
+
+Surfactant Parameters:
+  beta               = 0.3
+  Pe (Peclet)        = 10000.0
+
+Geometry Parameters:
+  theta (degrees)    = 20.0
+  hp (precursor)     = 0.0001
+  Lx (domain size)   = 6.0
+  N (elements)       = 4000
+  max_refinement     = 5
+  output_dir         = C:\Users\Admin\Desktop\my repo\Coalescence-2-fluids\sweep_beta_Pe_results\beta_0.3_Pe_10000
+============================================================
+
+
+Simulation complete.

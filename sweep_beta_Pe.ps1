@@ -14,8 +14,8 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $SCRIPT_FULL_PATH = $MyInvocation.MyCommand.Path
 
 # Parameter values
-$BETA_VALUES = @(0, 0.1, 0.5, 0.9)
-$PE_VALUES = @(1, 10, 100, 1000, 10000)
+$BETA_VALUES = @(0.05,0.1,0.15,0.2,0.3,0.4,0.5)
+$PE_VALUES = @(1,10,100,1000, 10000)
 $BASE_DIR = Join-Path $ScriptDir "sweep_beta_Pe_results"
 $BATCH_SIZE = 1  # Run 1 simulation at a time to avoid DLL locking with parallel compilation
 

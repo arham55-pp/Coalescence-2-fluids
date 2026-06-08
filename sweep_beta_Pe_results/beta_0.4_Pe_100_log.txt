@@ -1,0 +1,38 @@
+Traceback (most recent call last):
+  File "C:\Users\Admin\Desktop\my repo\Coalescence-2-fluids\coalescence.py", line 159, in <module>
+    problem.run(200,outstep=0.1,startstep=0.01,maxstep=50,temporal_error=1,spatial_adapt=1)
+  File "C:\Users\Admin\Desktop\my repo\Coalescence-2-fluids\.venv\Lib\site-packages\pyoomph\generic\problem.py", line 5059, in run
+    _tstart=self.get_current_time() #This might call initialise!
+            ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Admin\Desktop\my repo\Coalescence-2-fluids\.venv\Lib\site-packages\pyoomph\generic\problem.py", line 3303, in get_current_time
+    self.initialise()
+  File "C:\Users\Admin\Desktop\my repo\Coalescence-2-fluids\.venv\Lib\site-packages\pyoomph\generic\problem.py", line 2559, in initialise
+    self.compile_meshes()
+  File "C:\Users\Admin\Desktop\my repo\Coalescence-2-fluids\.venv\Lib\site-packages\pyoomph\generic\problem.py", line 1611, in compile_meshes
+    mesh._compile_bulk_equations() 
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Admin\Desktop\my repo\Coalescence-2-fluids\.venv\Lib\site-packages\pyoomph\meshes\mesh.py", line 979, in _compile_bulk_equations
+    self._codegen._code = self._problem.compile_bulk_element_code(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Admin\Desktop\my repo\Coalescence-2-fluids\.venv\Lib\site-packages\pyoomph\generic\problem.py", line 3167, in compile_bulk_element_code
+    res=self.generate_and_compile_bulk_element_code(elementtype,trunk,suppress_writing,suppress_compilation,bulkmesh,self.is_quiet(),self.extra_compiler_flags)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: ccompiler.cpp:227: DLL C:\Users\Admin\Desktop\my repo\Coalescence-2-fluids\sweep_beta_Pe_results\beta_0.4_Pe_100\_ccode\domain.dll, i.e. C:\Users\Admin\Desktop\my repo\Coalescence-2-fluids\sweep_beta_Pe_results\beta_0.4_Pe_100\_ccode\domain.dll could not be loaded. Error code: 4551
+
+============================================================
+DROPLET COALESCENCE SIMULATION - PARAMETERS
+============================================================
+
+Surfactant Parameters:
+  beta               = 0.4
+  Pe (Peclet)        = 100.0
+
+Geometry Parameters:
+  theta (degrees)    = 20.0
+  hp (precursor)     = 0.0001
+  Lx (domain size)   = 6.0
+  N (elements)       = 4000
+  max_refinement     = 5
+  output_dir         = C:\Users\Admin\Desktop\my repo\Coalescence-2-fluids\sweep_beta_Pe_results\beta_0.4_Pe_100
+============================================================
+
